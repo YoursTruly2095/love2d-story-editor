@@ -1,7 +1,7 @@
 viewer = {}
 
 function viewer:load()
-    viewer.graphic = love.graphics.newImage("main-view.png")
+    viewer.graphic = love.graphics.newImage("graphics/main-view.png")
 end
 
 function viewer:update(dt)
