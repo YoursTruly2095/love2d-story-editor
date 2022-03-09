@@ -6,6 +6,10 @@ package.path = package.path .. ";../third-party/?/?.lua"
 require("editor")
 
 function love.load(arg)
+  -- stuff for debugging in zerobrane
+  require("mobdebug").start()
+  io.stdout:setvbuf("no")
+  
   editor:load()
 end
 
