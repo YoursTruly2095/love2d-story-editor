@@ -5,12 +5,12 @@ local suit = require("suit")
 
 editor = {}
 -- storage for text input
-local input = {text = ""}
+local input = {text = {""}}
 
 function editor:load()
     -- make love use font which support CJK text
-    -- local font = love.graphics.newFont("NotoSansHans-Regular.otf", 20)
-    -- love.graphics.setFont(font)
+    local font = love.graphics.newFont("Courier Prime.ttf", 20)
+    love.graphics.setFont(font)
 end
 
 function editor:update()
@@ -44,9 +44,13 @@ end
 
 
 -- redirect some love UI functions
+
 function love.textedited(text, start, length)
     -- for IME input
-    suit.textedited(text, start, length)
+    --suit.textedited(text, start, length)
+    if length > 0 then
+        print("IME " .. text .. " " .. start .. " " .. length)
+    end
 end
 
 function love.textinput(t)

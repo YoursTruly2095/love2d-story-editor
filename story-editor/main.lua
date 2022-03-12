@@ -1,6 +1,6 @@
 
 -- allow access to third party code
-package.path = package.path .. ";../third-party/?/?.lua"
+--package.path = package.path .. ";../third-party/?/?.lua"
 
 
 require("editor")
