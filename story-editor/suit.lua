@@ -35,7 +35,8 @@ theme.cornerRadius = 4
 theme.color = {
 	normal   = {bg = { 0.25, 0.25, 0.25}, fg = {0.73,0.73,0.73}},
 	hovered  = {bg = { 0.19,0.6,0.73}, fg = {1,1,1}},
-	active   = {bg = {1,0.6,  0}, fg = {1,1,1}}
+	active   = {bg = {1,0.6,  0}, fg = {1,1,1}},
+    highlight= {bg = {0.4,0.4,0.25}, fg = {1,1,1}}
 }
 
 
@@ -146,6 +147,49 @@ function theme.Input(input, opt, x,y,w,h)
 	love.graphics.setScissor(x-1,y,w+2,h)
 	x = x - input.text_draw_offset
 
+    -- selection highlight
+    if input.select or input.process_selection then
+        local start, finish = input.selection_start, input.selection_end 
+        
+        if finish.line < start.line or (finish.line == start.line and finish.pos < start.pos) then
+            -- end was before start - swap them
+            local temp = finish
+            finish = start
+            start = temp
+        end
+    
+        -- draw a hightlight
+        love.graphics.setColor((opt.color and opt.color.highlight and opt.color.highlight.bg) or theme.color.highlight.bg)
+        local lines = finish.line - start.line + 1
+        local hx = x+opt.font:getWidth(input.text[start.line]:sub(1, start.pos-1))
+        local hy = (y+(h-th)/2)+((start.line-1)*lh)
+        local hw
+        if lines == 1 then
+            -- selection is within a single line
+            -- need to draw a rectangle based on the start / end positions
+            hw = opt.font:getWidth(input.text[start.line]:sub(start.pos, utf8.offset(input.text[start.line], finish.pos)-1))
+            love.graphics.rectangle('fill', hx, hy, hw, lh)
+        else
+            -- first line goes from selection start to end of line
+            -- last line goes from start of line to end of selection
+            -- all other lines are fully highlighted
+            hw = opt.font:getWidth(input.text[start.line]:sub(start.pos))
+            love.graphics.rectangle('fill', hx, hy, hw, lh)
+            
+            for line = start.line + 1, finish.line - 1 do
+                hy = hy + lh
+                hw = opt.font:getWidth(input.text[line])
+                love.graphics.rectangle('fill', x, hy, hw, lh)
+            end
+            
+            hy = hy + lh
+            hw = opt.font:getWidth(input.text[finish.line]:sub(1, finish.pos-1))
+            love.graphics.rectangle('fill', x, hy, hw, lh)
+                
+        end
+    end
+    
+
 	-- text
 	love.graphics.setColor((opt.color and opt.color.normal and opt.color.normal.fg) or theme.color.normal.fg)
 	love.graphics.setFont(opt.font)
@@ -153,15 +197,17 @@ function theme.Input(input, opt, x,y,w,h)
         love.graphics.print(text, x, (y+(h-th)/2)+((i-1)*lh))
     end
 
+
+
 	-- cursor
 	if opt.hasKeyboardFocus and (love.timer.getTime() % 1) > .5 then
         local s = input.text[input.cursorline]:sub(1, utf8.offset(input.text[input.cursorline], input.cursor)-1)
-		local cx = opt.font:getWidth(s)
-		local cy = (y+(h-th)/2)+((input.cursorline-1)*lh)
+        local cx = x+opt.font:getWidth(s)
+        local cy = (y+(h-th)/2)+((input.cursorline-1)*lh)
         
 		love.graphics.setLineWidth(1)
 		love.graphics.setLineStyle('rough')
-        love.graphics.line(x+cx, cy, x+cx, cy+lh)
+        love.graphics.line(cx, cy, cx, cy+lh)
 	end
 
 	-- candidate text
@@ -334,6 +380,7 @@ do
 		opt.font = opt.font or love.graphics.getFont()
 
 		input.text = input.text or {""}
+        input.select = input.select or false
         
         -- need to find widest line
         local text_width = 0
@@ -359,6 +406,29 @@ do
 			local s = input.text[input.cursorline]:sub(1, utf8.offset(input.text[input.cursorline], input.cursor)-1)
 			opt.cursor_pos = opt.font:getWidth(s)
 		end
+
+        -- handle selection end
+        local shifted = core:shift()
+        
+        --need to continuously update selection end from the cursor position
+        if input.select and shifted then
+            -- update selection based on cursor
+            input.selection_end = {line=input.cursorline, pos=input.cursor}
+        elseif input.select and not shifted then
+            -- end of selection
+            if input.selection_end.line < input.selection_start.line or 
+                input.selection_end.line == input.selection_start.line and input.selection_end.pos < input.selection_start.pos 
+            then
+                print("swapping start/end")
+                local start = input.selection_end
+                input.selection_end = input.selection_start
+                input.selection_start = start
+            end
+            print("Selection started at line "..input.selection_start.line.." position "..input.selection_start.pos)
+            print("Selection ended at line "..input.selection_end.line.." position "..input.selection_end.pos)
+            input.process_selection = true
+            input.select = false
+        end
 
 		-- compute drawing offset
 		local wm = w - 6 -- consider margin
@@ -390,6 +460,10 @@ do
 			local keycode,char = core:getPressedKey()
 			-- text input
 			if char and char ~= "" then
+				if input.process_selection then 
+                    -- replace the whole selection?
+                end
+                input.process_selection = false
 				local a,b = split(input.text[input.cursorline], input.cursor)
 				input.text[input.cursorline] = table.concat{a, char, b}
 				input.cursor = input.cursor + utf8.len(char)
@@ -397,7 +471,12 @@ do
 
 			-- text editing
 			if keycode == 'backspace' then
-				if input.cursor == 1 then
+				if input.process_selection then 
+                    -- delete the whole selection?
+                end
+                input.process_selection = false
+                
+                if input.cursor == 1 then
                     -- backspace removes a line break
                     if input.cursorline > 1 then
                         local a = input.text[input.cursorline-1]
@@ -413,6 +492,10 @@ do
                     input.cursor = math.max(1, input.cursor-1)
                 end
 			elseif keycode == 'delete' then
+				if input.process_selection then 
+                    -- delete the whole selection?
+                end
+                input.process_selection = false
                 if input.cursor == utf8.len(input.text[input.cursorline])+1 then
                     -- backspace removes a line break
                     if input.cursorline < #input.text then
@@ -427,30 +510,54 @@ do
                     input.text[input.cursorline] = table.concat{a, b}
                 end
             elseif keycode == 'return' then
+				if input.process_selection then 
+                    -- delete the whole selection?
+                end
+                input.process_selection = false
 				local a,b = split(input.text[input.cursorline], input.cursor)
                 input.text[input.cursorline] = a
                 input.cursor = 1
                 input.cursorline = input.cursorline + 1
                 table.insert(input.text, input.cursorline, b)
-			end
+			
+                -- implement copy, paste, cut, undo with our selection buffer
+            
+            end
 
 			-- cursor movement
+            local function check_shift()
+                input.process_selection = false
+                if not input.select and core:shift() then
+                    input.select = true
+                    input.selection_start = {line=input.cursorline, pos=input.cursor}
+                    input.selection_end = input.selection_start 
+                end
+            end
+                        
 			if keycode =='up' then
+                check_shift()
                 input.cursorline = math.max(1, input.cursorline-1)
 				input.cursor = math.min(input.cursor, utf8.len(input.text[input.cursorline])+1)
 			elseif keycode =='down' then -- cursor movement
+                check_shift()
                 input.cursorline = math.min(#input.text, input.cursorline+1)
 				input.cursor = math.min(input.cursor, utf8.len(input.text[input.cursorline])+1)
 			elseif keycode =='left' then
+                check_shift()
 				input.cursor = math.max(0, input.cursor-1)
 			elseif keycode =='right' then -- cursor movement
+                check_shift()
 				input.cursor = math.min(utf8.len(input.text[input.cursorline])+1, input.cursor+1)
 			elseif keycode =='home' then -- cursor movement
+                check_shift()
 				input.cursor = 1
 			elseif keycode =='end' then -- cursor movement
+                check_shift()
 				input.cursor = utf8.len(input.text[input.cursorline])+1
 			end
 
+            --if core:shift() then print("shift") end
+            
 			-- move cursor position with mouse when clicked on
 			--[[
             if core:mouseReleasedOn(opt.id) then
@@ -1044,8 +1151,26 @@ do
 	end
 
 	function suit:keypressed(key)
-		self.key_down = key
+        if key == 'lshift' then
+            suit.lshift = true 
+        elseif key == 'rshift' then
+            suit.rshift = true
+        else
+            self.key_down = key
+        end
 	end
+    
+	function suit:keyreleased(key)
+        if key == 'lshift' then
+            suit.lshift = false
+        elseif key == 'rshift' then
+            suit.rshift = false
+        end
+	end
+    
+    function suit:shift()
+        return suit.lshift or suit.rshift
+    end
 
 	function suit:textinput(char)
 		self.textchar = char
@@ -1147,6 +1272,7 @@ return setmetatable({
 
 	getPressedKey = function(...) return instance:getPressedKey(...) end,
 	keypressed = function(...) return instance:keypressed(...) end,
+	keyreleased = function(...) return instance:keyreleased(...) end,
 	textinput = function(...) return instance:textinput(...) end,
 	textedited = function(...) return instance:textedited(...) end,
 	grabKeyboardFocus = function(...) return instance:grabKeyboardFocus(...) end,

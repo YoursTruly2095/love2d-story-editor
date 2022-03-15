@@ -62,3 +62,8 @@ function love.keypressed(key)
 	-- forward keypresses to SUIT
 	suit.keypressed(key)
 end
+
+function love.keyreleased(key)
+	-- forward keypresses to SUIT
+	suit.keyreleased(key)
+end
