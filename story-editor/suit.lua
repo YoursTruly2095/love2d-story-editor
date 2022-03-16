@@ -409,6 +409,7 @@ do
 
         -- handle selection end
         local shifted = core:shift()
+        local control = core:ctrl()
         
         --need to continuously update selection end from the cursor position
         if input.select and shifted then
@@ -423,13 +424,63 @@ do
                 input.selection_end = input.selection_start
                 input.selection_start = start
             end
-            print("Selection started at line "..input.selection_start.line.." position "..input.selection_start.pos)
-            print("Selection ended at line "..input.selection_end.line.." position "..input.selection_end.pos)
+            --print("Selection started at line "..input.selection_start.line.." position "..input.selection_start.pos)
+            --print("Selection ended at line "..input.selection_end.line.." position "..input.selection_end.pos)
+            
+            input.selection = { }
             input.process_selection = true
             input.select = false
         end
 
+        local function copy_selection()
+            if not input.selection then return end
+            local start = input.selection_start
+            local finish = input.selection_end
+            local line = input.text[start.line]:sub(1, start.pos-1)
+        
+            local lines = finish.line - start.line + 1
+        
+            if lines == 1 then
+                -- selection is within a single line
+                table.insert(input.selection, input.text[start.line]:sub(start.pos,finish.pos-1))
+            else
+                -- first line goes from selection start to end of line
+                -- last line goes from start of line to end of selection
+                -- all other lines are fully highlighted
+                table.insert(input.selection, input.text[start.line]:sub(start.pos)) 
+
+                for line = start.line + 1, finish.line - 1 do
+                    table.insert(input.selection, input.text[line])
+                end
+                
+                table.insert(input.selection, input.text[finish.line]:sub(1, finish.pos-1))
+            
+            end
+            for k,v in ipairs(input.selection) do
+                print(v)
+            end            
+        end
+        
+        local function insert_selection()
+            if not input.selection then return end
+            local line, pos = input.cursorline, input.cursor
+            if #input.selection == 1 then
+                local s,e = input.text[line]:sub(1,pos),input.text[line]:sub(pos)
+                input.text[line] = s..input.selection[1]..e
+            elseif #input.selection == 2 then
+                input.text[line] = input.text[line]:sub(1,pos)..input.selection[1]
+                table.insert(input.text, input.selection[2]..input.text[line]:sub(pos))
+            else
+                input.text[line] = input.text[line]:sub(1,pos)..input.selection[1]
+                for i=2, #input.selection-1 do
+                    table.insert(input.text, line+i-1, input.selection[i])
+                end
+                table.insert(input.text, input.selection[#input.selection-1]..input.text[line]:sub(pos))
+            end
+        end
+    
         local function delete_selection()
+            if not input.selection then return end
             local start = input.selection_start
             local finish = input.selection_end
             local line = input.text[start.line]:sub(1, start.pos-1)
@@ -479,128 +530,149 @@ do
 --		if (core.candidate_text.text == "") and opt.hasKeyboardFocus then
 		if opt.hasKeyboardFocus then
 			local keycode,char = core:getPressedKey()
-			-- text input
-			if char and char ~= "" then
-				if input.process_selection then 
-                    -- delete the whole selection?
-                    delete_selection()
-                    input.process_selection = false
+            
+            if control then
+                if input.process_selection then
+                    if keycode == 'x' or keycode == 'X' then
+                        copy_selection()
+                        delete_selection()
+                        input.process_selection = false
+                    end
+                    if keycode == 'c' or keycode == 'C' then
+                        copy_selection()
+                        --input.process_selection = false
+                    end
                 end
-				local a,b = split(input.text[input.cursorline], input.cursor)
-				input.text[input.cursorline] = table.concat{a, char, b}
-				input.cursor = input.cursor + utf8.len(char)
-			end
-
-			-- text editing
-			if keycode == 'backspace' then
-				if input.process_selection then 
-                    -- delete the whole selection?
+                if keycode == 'v' or keycode == 'V' then
                     delete_selection()
+                    insert_selection()
                     input.process_selection = false
-                else
+                end                    
+            else
+            
+                -- text input
+                if char and char ~= "" then
+                    if input.process_selection then 
+                        -- delete the whole selection?
+                        delete_selection()
+                        input.process_selection = false
+                    end
+                    local a,b = split(input.text[input.cursorline], input.cursor)
+                    input.text[input.cursorline] = table.concat{a, char, b}
+                    input.cursor = input.cursor + utf8.len(char)
+                end
+
+                -- text editing
+                if keycode == 'backspace' then
+                    if input.process_selection then 
+                        -- delete the whole selection?
+                        delete_selection()
+                        input.process_selection = false
+                    else
+                    
+                        if input.cursor == 1 then
+                            -- backspace removes a line break
+                            if input.cursorline > 1 then
+                                local a = input.text[input.cursorline-1]
+                                local b = input.text[input.cursorline]
+                                table.remove(input.text, input.cursorline)
+                                input.cursorline = input.cursorline - 1
+                                input.cursor = utf8.len(input.text[input.cursorline])+1
+                                input.text[input.cursorline] = table.concat{a,b}
+                            end
+                        else
+                            local a,b = split(input.text[input.cursorline], input.cursor)
+                            input.text[input.cursorline] = table.concat{split(a,utf8.len(a)), b}
+                            input.cursor = math.max(1, input.cursor-1)
+                        end
+                    end
+                elseif keycode == 'delete' then
+                    if input.process_selection then 
+                        -- delete the whole selection?
+                        delete_selection()
+                        input.process_selection = false
+                    else
+                        if input.cursor == utf8.len(input.text[input.cursorline])+1 then
+                            -- backspace removes a line break
+                            if input.cursorline < #input.text then
+                                local a = input.text[input.cursorline]
+                                local b = input.text[input.cursorline+1]
+                                input.text[input.cursorline] = table.concat{a,b}
+                                table.remove(input.text, input.cursorline+1)
+                            end
+                        else
+                            local a,b = split(input.text[input.cursorline], input.cursor)
+                            local _,b = split(b, 2)
+                            input.text[input.cursorline] = table.concat{a, b}
+                        end
+                    end
+                elseif keycode == 'return' then
+                    if input.process_selection then 
+                        -- delete the whole selection?
+                        delete_selection()
+                        input.process_selection = false
+                    end
+                    local a,b = split(input.text[input.cursorline], input.cursor)
+                    input.text[input.cursorline] = a
+                    input.cursor = 1
+                    input.cursorline = input.cursorline + 1
+                    table.insert(input.text, input.cursorline, b)
                 
-                    if input.cursor == 1 then
-                        -- backspace removes a line break
-                        if input.cursorline > 1 then
-                            local a = input.text[input.cursorline-1]
-                            local b = input.text[input.cursorline]
-                            table.remove(input.text, input.cursorline)
-                            input.cursorline = input.cursorline - 1
-                            input.cursor = utf8.len(input.text[input.cursorline])+1
-                            input.text[input.cursorline] = table.concat{a,b}
-                        end
-                    else
-                        local a,b = split(input.text[input.cursorline], input.cursor)
-                        input.text[input.cursorline] = table.concat{split(a,utf8.len(a)), b}
-                        input.cursor = math.max(1, input.cursor-1)
+                    -- implement copy, paste, cut, undo with our selection buffer
+                
+                end
+
+                -- cursor movement
+                local function check_shift()
+                    input.process_selection = false
+                    if not input.select and shifted then
+                        input.select = true
+                        input.selection_start = {line=input.cursorline, pos=input.cursor}
+                        input.selection_end = input.selection_start 
                     end
                 end
-			elseif keycode == 'delete' then
-				if input.process_selection then 
-                    -- delete the whole selection?
-                    delete_selection()
-                    input.process_selection = false
-                else
-                    if input.cursor == utf8.len(input.text[input.cursorline])+1 then
-                        -- backspace removes a line break
-                        if input.cursorline < #input.text then
-                            local a = input.text[input.cursorline]
-                            local b = input.text[input.cursorline+1]
-                            input.text[input.cursorline] = table.concat{a,b}
-                            table.remove(input.text, input.cursorline+1)
+                            
+                if keycode =='up' then
+                    check_shift()
+                    input.cursorline = math.max(1, input.cursorline-1)
+                    input.cursor = math.min(input.cursor, utf8.len(input.text[input.cursorline])+1)
+                elseif keycode =='down' then -- cursor movement
+                    check_shift()
+                    input.cursorline = math.min(#input.text, input.cursorline+1)
+                    input.cursor = math.min(input.cursor, utf8.len(input.text[input.cursorline])+1)
+                elseif keycode =='left' then
+                    check_shift()
+                    input.cursor = math.max(0, input.cursor-1)
+                elseif keycode =='right' then -- cursor movement
+                    check_shift()
+                    input.cursor = math.min(utf8.len(input.text[input.cursorline])+1, input.cursor+1)
+                elseif keycode =='home' then -- cursor movement
+                    check_shift()
+                    input.cursor = 1
+                elseif keycode =='end' then -- cursor movement
+                    check_shift()
+                    input.cursor = utf8.len(input.text[input.cursorline])+1
+                end
+
+                --if core:shift() then print("shift") end
+                
+                -- move cursor position with mouse when clicked on
+                --[[
+                if core:mouseReleasedOn(opt.id) then
+                    local mx = core:getMousePosition() - x + input.text_draw_offset
+                    input.cursor = utf8.len(input.text) + 1
+                    for c = 1,input.cursor do
+                        local s = input.text:sub(0, utf8.offset(input.text, c)-1)
+                        if opt.font:getWidth(s) >= mx then
+                            input.cursor = c-1
+                            break
                         end
-                    else
-                        local a,b = split(input.text[input.cursorline], input.cursor)
-                        local _,b = split(b, 2)
-                        input.text[input.cursorline] = table.concat{a, b}
                     end
                 end
-            elseif keycode == 'return' then
-				if input.process_selection then 
-                    -- delete the whole selection?
-                    delete_selection()
-                    input.process_selection = false
-                end
-				local a,b = split(input.text[input.cursorline], input.cursor)
-                input.text[input.cursorline] = a
-                input.cursor = 1
-                input.cursorline = input.cursorline + 1
-                table.insert(input.text, input.cursorline, b)
-			
-                -- implement copy, paste, cut, undo with our selection buffer
-            
+                --]]
             end
-
-			-- cursor movement
-            local function check_shift()
-                input.process_selection = false
-                if not input.select and core:shift() then
-                    input.select = true
-                    input.selection_start = {line=input.cursorline, pos=input.cursor}
-                    input.selection_end = input.selection_start 
-                end
-            end
-                        
-			if keycode =='up' then
-                check_shift()
-                input.cursorline = math.max(1, input.cursorline-1)
-				input.cursor = math.min(input.cursor, utf8.len(input.text[input.cursorline])+1)
-			elseif keycode =='down' then -- cursor movement
-                check_shift()
-                input.cursorline = math.min(#input.text, input.cursorline+1)
-				input.cursor = math.min(input.cursor, utf8.len(input.text[input.cursorline])+1)
-			elseif keycode =='left' then
-                check_shift()
-				input.cursor = math.max(0, input.cursor-1)
-			elseif keycode =='right' then -- cursor movement
-                check_shift()
-				input.cursor = math.min(utf8.len(input.text[input.cursorline])+1, input.cursor+1)
-			elseif keycode =='home' then -- cursor movement
-                check_shift()
-				input.cursor = 1
-			elseif keycode =='end' then -- cursor movement
-                check_shift()
-				input.cursor = utf8.len(input.text[input.cursorline])+1
-			end
-
-            --if core:shift() then print("shift") end
-            
-			-- move cursor position with mouse when clicked on
-			--[[
-            if core:mouseReleasedOn(opt.id) then
-				local mx = core:getMousePosition() - x + input.text_draw_offset
-				input.cursor = utf8.len(input.text) + 1
-				for c = 1,input.cursor do
-					local s = input.text:sub(0, utf8.offset(input.text, c)-1)
-					if opt.font:getWidth(s) >= mx then
-						input.cursor = c-1
-						break
-					end
-				end
-			end
-            --]]
-		end
-
+        end
+        
 --		input.candidate_text = {text=core.candidate_text.text, start=core.candidate_text.start, length=core.candidate_text.length}
 		core:registerDraw(opt.draw or core.theme.Input, input, opt, x,y,w,h)
 
@@ -1182,6 +1254,10 @@ do
             suit.lshift = true 
         elseif key == 'rshift' then
             suit.rshift = true
+        elseif key == 'lctrl' then
+            suit.lctrl = true
+        elseif key == 'rctrl' then
+            suit.rctrl = true
         else
             self.key_down = key
         end
@@ -1192,11 +1268,19 @@ do
             suit.lshift = false
         elseif key == 'rshift' then
             suit.rshift = false
+        elseif key == 'lctrl' then
+            suit.lctrl = false
+        elseif key == 'rctrl' then
+            suit.rctrl = false
         end
 	end
     
     function suit:shift()
         return suit.lshift or suit.rshift
+    end
+    
+    function suit:ctrl()
+        return suit.lctrl or suit.rctrl
     end
 
 	function suit:textinput(char)
