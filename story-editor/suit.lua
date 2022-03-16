@@ -419,7 +419,6 @@ do
             if input.selection_end.line < input.selection_start.line or 
                 input.selection_end.line == input.selection_start.line and input.selection_end.pos < input.selection_start.pos 
             then
-                print("swapping start/end")
                 local start = input.selection_end
                 input.selection_end = input.selection_start
                 input.selection_start = start
@@ -430,7 +429,29 @@ do
             input.select = false
         end
 
-		-- compute drawing offset
+        local function delete_selection()
+            local start = input.selection_start
+            local finish = input.selection_end
+            local line = input.text[start.line]:sub(1, start.pos-1)
+        
+            local lines = finish.line - start.line + 1
+        
+            if lines == 1 then
+                -- selection is within a single line
+                input.text[start.line] = line .. input.text[start.line]:sub(finish.pos)
+            else
+                -- first line goes from selection start to end of line
+                -- last line goes from start of line to end of selection
+                -- all other lines are fully highlighted
+                input.text[start.line] = line .. input.text[finish.line]:sub(finish.pos)
+            
+                for _ = start.line + 1, finish.line do
+                    table.remove(input.text, start.line+1)
+                end
+            end
+        end
+            
+ 		-- compute drawing offset
 		local wm = w - 6 -- consider margin
 		input.text_draw_offset = input.text_draw_offset or 0
 		if opt.cursor_pos - input.text_draw_offset < 0 then
@@ -461,9 +482,10 @@ do
 			-- text input
 			if char and char ~= "" then
 				if input.process_selection then 
-                    -- replace the whole selection?
+                    -- delete the whole selection?
+                    delete_selection()
+                    input.process_selection = false
                 end
-                input.process_selection = false
 				local a,b = split(input.text[input.cursorline], input.cursor)
 				input.text[input.cursorline] = table.concat{a, char, b}
 				input.cursor = input.cursor + utf8.len(char)
@@ -473,47 +495,52 @@ do
 			if keycode == 'backspace' then
 				if input.process_selection then 
                     -- delete the whole selection?
-                end
-                input.process_selection = false
-                
-                if input.cursor == 1 then
-                    -- backspace removes a line break
-                    if input.cursorline > 1 then
-                        local a = input.text[input.cursorline-1]
-                        local b = input.text[input.cursorline]
-                        table.remove(input.text, input.cursorline)
-                        input.cursorline = input.cursorline - 1
-                        input.cursor = utf8.len(input.text[input.cursorline])+1
-                        input.text[input.cursorline] = table.concat{a,b}
-                    end
+                    delete_selection()
+                    input.process_selection = false
                 else
-                    local a,b = split(input.text[input.cursorline], input.cursor)
-                    input.text[input.cursorline] = table.concat{split(a,utf8.len(a)), b}
-                    input.cursor = math.max(1, input.cursor-1)
+                
+                    if input.cursor == 1 then
+                        -- backspace removes a line break
+                        if input.cursorline > 1 then
+                            local a = input.text[input.cursorline-1]
+                            local b = input.text[input.cursorline]
+                            table.remove(input.text, input.cursorline)
+                            input.cursorline = input.cursorline - 1
+                            input.cursor = utf8.len(input.text[input.cursorline])+1
+                            input.text[input.cursorline] = table.concat{a,b}
+                        end
+                    else
+                        local a,b = split(input.text[input.cursorline], input.cursor)
+                        input.text[input.cursorline] = table.concat{split(a,utf8.len(a)), b}
+                        input.cursor = math.max(1, input.cursor-1)
+                    end
                 end
 			elseif keycode == 'delete' then
 				if input.process_selection then 
                     -- delete the whole selection?
-                end
-                input.process_selection = false
-                if input.cursor == utf8.len(input.text[input.cursorline])+1 then
-                    -- backspace removes a line break
-                    if input.cursorline < #input.text then
-                        local a = input.text[input.cursorline]
-                        local b = input.text[input.cursorline+1]
-                        input.text[input.cursorline] = table.concat{a,b}
-                        table.remove(input.text, input.cursorline+1)
-                    end
+                    delete_selection()
+                    input.process_selection = false
                 else
-                    local a,b = split(input.text[input.cursorline], input.cursor)
-                    local _,b = split(b, 2)
-                    input.text[input.cursorline] = table.concat{a, b}
+                    if input.cursor == utf8.len(input.text[input.cursorline])+1 then
+                        -- backspace removes a line break
+                        if input.cursorline < #input.text then
+                            local a = input.text[input.cursorline]
+                            local b = input.text[input.cursorline+1]
+                            input.text[input.cursorline] = table.concat{a,b}
+                            table.remove(input.text, input.cursorline+1)
+                        end
+                    else
+                        local a,b = split(input.text[input.cursorline], input.cursor)
+                        local _,b = split(b, 2)
+                        input.text[input.cursorline] = table.concat{a, b}
+                    end
                 end
             elseif keycode == 'return' then
 				if input.process_selection then 
                     -- delete the whole selection?
+                    delete_selection()
+                    input.process_selection = false
                 end
-                input.process_selection = false
 				local a,b = split(input.text[input.cursorline], input.cursor)
                 input.text[input.cursorline] = a
                 input.cursor = 1
