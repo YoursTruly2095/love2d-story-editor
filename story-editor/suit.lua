@@ -464,18 +464,19 @@ do
         local function insert_selection()
             if not input.selection then return end
             local line, pos = input.cursorline, input.cursor
+            local s,e = input.text[line]:sub(1,pos-1),input.text[line]:sub(pos)
             if #input.selection == 1 then
-                local s,e = input.text[line]:sub(1,pos),input.text[line]:sub(pos)
+                --print("line="..input.text[line], "s="..s, "e="..e)
                 input.text[line] = s..input.selection[1]..e
             elseif #input.selection == 2 then
-                input.text[line] = input.text[line]:sub(1,pos)..input.selection[1]
-                table.insert(input.text, input.selection[2]..input.text[line]:sub(pos))
+                input.text[line] = s..input.selection[1]
+                table.insert(input.text, line+1, input.selection[2]..e)
             else
-                input.text[line] = input.text[line]:sub(1,pos)..input.selection[1]
+                input.text[line] = s..input.selection[1]
                 for i=2, #input.selection-1 do
                     table.insert(input.text, line+i-1, input.selection[i])
                 end
-                table.insert(input.text, input.selection[#input.selection-1]..input.text[line]:sub(pos))
+                table.insert(input.text, line+#input.selection, input.selection[#input.selection]..e)
             end
         end
     
@@ -500,6 +501,9 @@ do
                     table.remove(input.text, start.line+1)
                 end
             end
+            
+            -- validate the cursor
+            if input.cursor > utf8.len(input.text[input.cursorline]) then input.cursor = utf8.len(input.text[input.cursorline])+1 end
         end
             
  		-- compute drawing offset
@@ -544,7 +548,9 @@ do
                     end
                 end
                 if keycode == 'v' or keycode == 'V' then
-                    delete_selection()
+                    if input.process_selection then
+                        delete_selection()
+                    end
                     insert_selection()
                     input.process_selection = false
                 end                    
