@@ -10,6 +10,7 @@ function love.load(arg)
   require("mobdebug").start()
   io.stdout:setvbuf("no")
   
+  love.window.setFullscreen(true)
   editor:load()
 end
 

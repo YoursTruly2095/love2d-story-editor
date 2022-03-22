@@ -468,15 +468,20 @@ do
             if #input.selection == 1 then
                 --print("line="..input.text[line], "s="..s, "e="..e)
                 input.text[line] = s..input.selection[1]..e
+                input.cursor = utf8.len(s..input.selection[1])+1
             elseif #input.selection == 2 then
                 input.text[line] = s..input.selection[1]
                 table.insert(input.text, line+1, input.selection[2]..e)
+                input.cursorline = input.cursorline + 1
+                input.cursor = utf8.len(input.selection[2])+1
             else
                 input.text[line] = s..input.selection[1]
                 for i=2, #input.selection-1 do
                     table.insert(input.text, line+i-1, input.selection[i])
                 end
-                table.insert(input.text, line+#input.selection, input.selection[#input.selection]..e)
+                table.insert(input.text, line+#input.selection-1, input.selection[#input.selection]..e)
+                input.cursorline = line+#input.selection-1
+                input.cursor = utf8.len(input.selection[#input.selection])+1
             end
         end
     
