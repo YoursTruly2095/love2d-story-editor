@@ -6,8 +6,11 @@ local suit = require("suit")
 editor = {}
 -- storage for text input
 local story = {text = {""}}
+
 local options = { {text={""}} }
-local reqs = { {text={""}} }
+local reqs =    { {text={""}} }
+local results = { {text={""}} }
+
 
 function editor:load()
     -- make love use font which support CJK text
@@ -39,60 +42,79 @@ function editor:update()
 	-- if the button is pressed, quit the game
     
     --suit.layout:push(suit.layout:nextCol())
+    local function delete(which)
+        if #options > 1 then
+            table.remove(options, which)
+            table.remove(reqs, which)
+            table.remove(results, which)
+        end
+    end
+    
+    local function insert(where,which)
+        table.insert(options,where,options[which])
+        table.insert(reqs,where,reqs[which])
+        table.insert(results,where,results[which])
+    end
+    
+    local function new()
+        if #options < 5 then
+            table.insert(options, {text={""}})
+            table.insert(reqs, {text={""}})
+            table.insert(results, {text={""}})
+        end
+    end
     
     local function up(k)
         if k > 1  and #options > 1 then
-            table.insert(options,k-1,options[k])
-            table.remove(options, k+1)
-            table.insert(reqs,k-1,reqs[k])
-            table.remove(reqs, k+1)
+            insert(k-1, k)
+            delete(k+1)
         end
     end
     
     local function down(k)
         if k < #options and #options > 1 then
-            table.insert(options,k+2,options[k])
-            table.remove(options, k)
-            table.insert(reqs,k+2,reqs[k])
-            table.remove(reqs, k)
+            insert(k+2, k)
+            delete(k)
         end
     end
     
-    local function bin(k)
-        if #options > 1 then
-            table.remove(options, k)
-            table.remove(reqs, k)
-        end
-    end
+    local lw = 80                   -- label width
+    local tw = 700-50-50-25-25-80   -- text width
     
     local function entry(k)
-        suit.Label("text",suit.layout:col(60,35))
+        suit.Label("text",suit.layout:col(lw,35))
         suit.layout:padding(0)
-        suit.Input(options[k], suit.layout:col(500,35))
-        suit.layout:left(60)
-        suit.Label("reqs",suit.layout:row(60,35))
-        suit.Input(reqs[k], suit.layout:col(500,35))
-        suit.layout:up(500,35)
+        suit.Input(options[k], suit.layout:col(tw,35))
+        suit.layout:left(lw)
+        suit.Label("reqs",suit.layout:row(lw,35))
+        suit.Input(reqs[k], suit.layout:col(tw,35))
+        suit.layout:left(lw)
+        suit.Label("result",suit.layout:row(lw,35))
+        suit.Input(results[k], suit.layout:col(tw,35))
+        suit.layout:up(tw,70)
         suit.layout:padding(25)
-        if suit.Button("B"..k, suit.layout:col(50,70)).hit then bin(k) end
-        if suit.Button("U"..k, suit.layout:col(50,35)).hit then up(k) end
+        if suit.Button("B"..k, suit.layout:col(50,105)).hit then delete(k) end
+        if suit.Button("U"..k, suit.layout:col(50,52)).hit then up(k) end
         suit.layout:padding(0)
-        if suit.Button("D"..k, suit.layout:row(50,35)).hit then down(k) end
+        if suit.Button("D"..k, suit.layout:row(50,53)).hit then down(k) end
     end
 
     -- this must be a while loop not a for loop, because the BIN button 
     -- can change the length of value of #options
     local k=1
     while k <= #options do
-        suit.layout:reset(25,350+(95*(k-1)),25)
+        suit.layout:reset(25,350+(130*(k-1)),25)
         if k == 1 then
-            if suit.Button("New Option", suit.layout:row(150, 70)).hit then
-                if #options < 7 then
-                    table.insert(options, {text={""}})
-                    table.insert(reqs, {text={""}})
-                end
-            end
-        else    
+            if suit.Button("New Option", suit.layout:row(150,70)).hit then new() end
+        elseif k == 2 then
+            suit.layout:col(50,70)
+            suit.layout:padding(0)
+            if suit.Button("SU", suit.layout:col(50,52)).hit then scroll('up') end
+            if suit.Button("SD", suit.layout:row(50,53)).hit then scroll('down') end
+            suit.layout:up(50,53)
+            suit.layout:col(50,70)
+            suit.layout:padding(25)
+        else
             suit.layout:row(150,70)
         end
         entry(k)
