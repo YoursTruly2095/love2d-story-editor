@@ -37,12 +37,6 @@ function editor:update()
 
 	-- put a button of size 200x30 px in the cell below
 	-- if the button is pressed, quit the game
-	if suit.Button("New Option", suit.layout:row(150, 70)).hit then
-		if #options < 7 then
-            table.insert(options, {text={""}})
-            table.insert(reqs, {text={""}})
-        end
-	end
     
     --suit.layout:push(suit.layout:nextCol())
     
@@ -54,6 +48,7 @@ function editor:update()
             table.remove(reqs, k+1)
         end
     end
+    
     local function down(k)
         if k < #options and #options > 1 then
             table.insert(options,k+2,options[k])
@@ -62,12 +57,14 @@ function editor:update()
             table.remove(reqs, k)
         end
     end
+    
     local function bin(k)
         if #options > 1 then
             table.remove(options, k)
             table.remove(reqs, k)
         end
     end
+    
     local function entry(k)
         suit.Label("text",suit.layout:col(60,35))
         suit.layout:padding(0)
@@ -83,42 +80,31 @@ function editor:update()
         if suit.Button("D"..k, suit.layout:row(50,35)).hit then down(k) end
     end
 
-    entry(1)
-    --[[
-    suit.Label("text",suit.layout:col(60,35))
-    suit.layout:padding(0)
-    suit.Input(options[1], suit.layout:col(500,35))
-    suit.layout:left(60)
-    suit.Label("reqs",suit.layout:row(60,35))
-    suit.Input(reqs[1], suit.layout:col(500,35))
-    suit.layout:up(500,35)
-    suit.layout:padding(25)
-    if suit.Button("B1", suit.layout:col(50,70)).hit then bin(1) end
-    suit.Button("U1", suit.layout:col(50,35))
-    suit.layout:padding(0)
-    if suit.Button("D1", suit.layout:row(50,35)).hit then down(1) end
-    --]]
-    
+    -- this must be a while loop not a for loop, because the BIN button 
+    -- can change the length of value of #options
+    local k=1
+    while k <= #options do
+        suit.layout:reset(25,350+(95*(k-1)),25)
+        if k == 1 then
+            if suit.Button("New Option", suit.layout:row(150, 70)).hit then
+                if #options < 7 then
+                    table.insert(options, {text={""}})
+                    table.insert(reqs, {text={""}})
+                end
+            end
+        else    
+            suit.layout:row(150,70)
+        end
+        entry(k)
+        k = k + 1
+    end
+--[[        
     for k=2, #options do
         suit.layout:reset(25,350+(95*(k-1)),25)
         suit.layout:col(150,50)
         entry(k)
-        --[[
-        suit.Label("text",suit.layout:col(60,35))
-        suit.layout:padding(0)
-        suit.Input(options[k], suit.layout:col(500,35))
-        suit.layout:left(60)
-        suit.Label("reqs",suit.layout:row(60,35))
-        suit.Input(reqs[k], suit.layout:col(500,35))
-        suit.layout:up(500,35)
-        suit.layout:padding(25)
-        if suit.Button("B"..k, suit.layout:col(50,70)).hit then bin(k) end
-        if suit.Button("U"..k, suit.layout:col(50,35)).hit then up(k) end
-        suit.layout:padding(0)
-        if suit.Button("D"..k, suit.layout:row(50,35)).hit then down(k) end
-        --]]
     end
-        
+--]]        
 end
 
 function editor:draw()
