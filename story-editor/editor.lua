@@ -10,6 +10,7 @@ local story = {text = {""}}
 local options = { {text={""}} }
 local reqs =    { {text={""}} }
 local results = { {text={""}} }
+local scroll_offset = 0
 
 
 function editor:load()
@@ -57,11 +58,11 @@ function editor:update()
     end
     
     local function new()
-        if #options < 5 then
+        --if #options < 5 then
             table.insert(options, {text={""}})
             table.insert(reqs, {text={""}})
             table.insert(results, {text={""}})
-        end
+        --end
     end
     
     local function up(k)
@@ -77,6 +78,21 @@ function editor:update()
             delete(k)
         end
     end
+    
+    local function scroll(dir)
+        if dir == 'up' then
+            if scroll_offset > 0 then
+                scroll_offset = scroll_offset - 1
+            end
+        else
+            if scroll_offset < #options-5 then
+                scroll_offset = scroll_offset + 1
+            end
+        end
+    end
+    
+            
+            
     
     local lw = 80                   -- label width
     local tw = 700-50-50-25-25-80   -- text width
@@ -102,11 +118,13 @@ function editor:update()
     -- this must be a while loop not a for loop, because the BIN button 
     -- can change the length of value of #options
     local k=1
-    while k <= #options do
+    local limit = #options
+    if limit > 5 then limit = 5 end
+    while k <= limit do -- #options do
         suit.layout:reset(25,350+(130*(k-1)),25)
         if k == 1 then
             if suit.Button("New Option", suit.layout:row(150,70)).hit then new() end
-        elseif k == 2 then
+        elseif k == 2 and #options > 5 then
             suit.layout:col(50,70)
             suit.layout:padding(0)
             if suit.Button("SU", suit.layout:col(50,52)).hit then scroll('up') end
@@ -117,7 +135,7 @@ function editor:update()
         else
             suit.layout:row(150,70)
         end
-        entry(k)
+        entry(k+scroll_offset)
         k = k + 1
     end
 --[[        
