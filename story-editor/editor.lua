@@ -13,6 +13,7 @@ local data =
         {
             -- alternate story text at each level
             {
+                id = 100,
                 text =      { {text={""}} }, 
                 reqs =      { {text={""}} } 
             }
@@ -53,7 +54,7 @@ function editor:update()
         return id_register
     end
     
-    local story = data[story_level].story[story_alt]
+    local story = data[story_level].story
     local options = data[story_level].options
     local lw = 80                   -- label width
     
@@ -62,17 +63,38 @@ function editor:update()
 	suit.layout:reset(25,25,25)
 
     local function new_alt_story() 
-            -- much like new() below for the options?
+        table.insert(story, 
+            {
+                id =        new_id(),
+                text =      { {text={""}} },
+                reqs =      { {text={""}} },
+            })
+        story_alt = #story
+    end
+
+    local function story_left() 
+        if story_alt > 1 then story_alt = story_alt - 1 end
+    end
+    local function story_right() 
+        if story_alt < #story then story_alt = story_alt + 1 end
     end
 
 	-- put an input widget at the layout origin, with a cell size of 200 by 30 pixels
-	suit.Label("Story", suit.layout:row(150, 50))
+	suit.Label("Story (alt"..story_alt..")", suit.layout:row(150, 50))
     if suit.Button("New Alt", suit.layout:row(150,50)).hit then new_alt_story() end
-    suit.layout:up(150, 50)
-    suit.Input(story.text, suit.layout:col(700,265))
+    
+    if suit.Button("L", suit.layout:row(75,50)).hit then story_left() end
+    suit.layout:padding(0)
+    if suit.Button("R", suit.layout:col(75,50)).hit then story_right() end
+    suit.layout:padding(25)
+    
+    suit.layout:up(0, 125)
+    suit.layout:right(50, 0)        -- I don't understand why these values work but whatever
+    
+    suit.Input(story[story_alt].text, suit.layout:col(700,265))
     suit.layout:padding(0)
     suit.Label("reqs",suit.layout:row(lw,35))
-    suit.Input(story.reqs, suit.layout:col(700-lw,35))
+    suit.Input(story[story_alt].reqs, suit.layout:col(700-lw,35))
     
     -- need some 'side to side' scroll button for selection alt story versions
 
