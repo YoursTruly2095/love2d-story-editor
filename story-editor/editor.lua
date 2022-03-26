@@ -4,13 +4,39 @@ local suit = require("suit")
 
 
 editor = {}
--- storage for text input
-local story = {text = {""}}
 
-local options = { {text={""}} }
-local reqs =    { {text={""}} }
-local results = { {text={""}} }
+local data =
+{
+    -- story levels
+    {
+        story =     
+        {
+            -- alternate story text at each level
+            {
+                text =      { {text={""}} }, 
+                reqs =      { {text={""}} } 
+            }
+        },
+        
+        options = 
+        {
+            -- multiple options at each level
+            {
+                id = 101,
+                text =      { {text={""}} },
+                reqs =      { {text={""}} },
+                results =   { {text={""}} }
+            }
+        }
+    }
+}
+
+
+
 local scroll_offset = 0
+local story_level = 1
+local story_alt = 1
+local id_register = 101
 
 
 function editor:load()
@@ -22,47 +48,65 @@ end
 function editor:update()
     -- all the UI is defined in love.update or functions that are called from it
 	
-    -- put the layout origin at position (100,100)
+    local function new_id()
+        id_register = id_register + 1
+        return id_register
+    end
+    
+    local story = data[story_level].story[story_alt]
+    local options = data[story_level].options
+    local lw = 80                   -- label width
+    
+    -- STORY
 	-- the layout will grow down and to the right from this point
 	suit.layout:reset(25,25,25)
 
+    local function new_alt_story() 
+            -- much like new() below for the options?
+    end
+
 	-- put an input widget at the layout origin, with a cell size of 200 by 30 pixels
 	suit.Label("Story", suit.layout:row(150, 50))
-    --suit.layout:col(25,300)
-    suit.Input(story, suit.layout:col(700,300))
+    if suit.Button("New Alt", suit.layout:row(150,50)).hit then new_alt_story() end
+    suit.layout:up(150, 50)
+    suit.Input(story.text, suit.layout:col(700,265))
+    suit.layout:padding(0)
+    suit.Label("reqs",suit.layout:row(lw,35))
+    suit.Input(story.reqs, suit.layout:col(700-lw,35))
+    
+    -- need some 'side to side' scroll button for selection alt story versions
 
-	-- put a label that displays the text below the first cell
-	-- the cell size is the same as the last one (200x30 px)
-	-- the label text will be aligned to the left
-	--suit.Label("Hello, "..input.text, {align = "left"}, suit.layout:row())
-
-	-- put an empty cell that has the same size as the last cell (200x30 px)
+    
+    -- OPTIONS
 	suit.layout:reset(25,350,25)
-
-	-- put a button of size 200x30 px in the cell below
-	-- if the button is pressed, quit the game
     
     --suit.layout:push(suit.layout:nextCol())
     local function delete(which)
         if #options > 1 then
             table.remove(options, which)
-            table.remove(reqs, which)
-            table.remove(results, which)
+            
+            -- fix scroll offset
+            if scroll_offset > #options-5 then scroll_offset = #options-5 end
+            if scroll_offset < 0 then scroll_offset = 0 end
         end
     end
     
     local function insert(where,which)
         table.insert(options,where,options[which])
-        table.insert(reqs,where,reqs[which])
-        table.insert(results,where,results[which])
     end
     
     local function new()
-        --if #options < 5 then
-            table.insert(options, {text={""}})
-            table.insert(reqs, {text={""}})
-            table.insert(results, {text={""}})
-        --end
+        table.insert(options, 
+            {
+                id =        new_id(),
+                text =      { {text={""}} },
+                reqs =      { {text={""}} },
+                results =   { {text={""}} }
+            })
+            
+        -- set the scroll offset so the new option is visible
+        scroll_offset = #options-5
+        if scroll_offset < 0 then scroll_offset = 0 end
     end
     
     local function up(k)
@@ -94,33 +138,30 @@ function editor:update()
             
             
     
-    local lw = 80                   -- label width
     local tw = 700-50-50-25-25-80   -- text width
     
     local function entry(k)
-        suit.Label("text",suit.layout:col(lw,35))
+        suit.Label("opt"..k,suit.layout:col(lw,35))
         suit.layout:padding(0)
-        suit.Input(options[k], suit.layout:col(tw,35))
+        suit.Input(options[k].text, suit.layout:col(tw,35))
         suit.layout:left(lw)
         suit.Label("reqs",suit.layout:row(lw,35))
-        suit.Input(reqs[k], suit.layout:col(tw,35))
+        suit.Input(options[k].reqs, suit.layout:col(tw,35))
         suit.layout:left(lw)
         suit.Label("result",suit.layout:row(lw,35))
-        suit.Input(results[k], suit.layout:col(tw,35))
+        suit.Input(options[k].results, suit.layout:col(tw,35))
         suit.layout:up(tw,70)
         suit.layout:padding(25)
-        if suit.Button("B"..k, suit.layout:col(50,105)).hit then delete(k) end
-        if suit.Button("U"..k, suit.layout:col(50,52)).hit then up(k) end
+        if suit.Button("B", {id="B"..options[k].id}, suit.layout:col(50,105)).hit then delete(k) end
+        if suit.Button("U", {id="U"..options[k].id}, suit.layout:col(50,52)).hit then up(k) end
         suit.layout:padding(0)
-        if suit.Button("D"..k, suit.layout:row(50,53)).hit then down(k) end
+        if suit.Button("D", {id="D"..options[k].id}, suit.layout:row(50,53)).hit then down(k) end
     end
 
     -- this must be a while loop not a for loop, because the BIN button 
     -- can change the length of value of #options
     local k=1
-    local limit = #options
-    if limit > 5 then limit = 5 end
-    while k <= limit do -- #options do
+    while k <= math.min(#options, 5) do -- we cannot calculate this prior to the loop!!
         suit.layout:reset(25,350+(130*(k-1)),25)
         if k == 1 then
             if suit.Button("New Option", suit.layout:row(150,70)).hit then new() end
@@ -138,13 +179,7 @@ function editor:update()
         entry(k+scroll_offset)
         k = k + 1
     end
---[[        
-    for k=2, #options do
-        suit.layout:reset(25,350+(95*(k-1)),25)
-        suit.layout:col(150,50)
-        entry(k)
-    end
---]]        
+
 end
 
 function editor:draw()
