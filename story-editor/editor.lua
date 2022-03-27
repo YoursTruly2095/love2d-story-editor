@@ -7,11 +7,11 @@ editor = {}
 
 local data =
 {
-    -- story levels
+    -- story nodes
     {
         story =     
         {
-            -- alternate story text at each level
+            -- alternate story text at each node
             {
                 id = 100,
                 text =      { {text={""}} }, 
@@ -21,7 +21,7 @@ local data =
         
         options = 
         {
-            -- multiple options at each level
+            -- multiple options at each node
             {
                 id = 101,
                 text =      { {text={""}} },
@@ -35,14 +35,14 @@ local data =
 
 
 local scroll_offset = 0
-local story_level = 1
+local story_node = 1
 local story_alt = 1
 local id_register = 101
 
 
 function editor:load()
     -- make love use font which support CJK text
-    local font = love.graphics.newFont("Courier Prime.ttf", 20)
+    local font = love.graphics.newFont("Courier Prime.ttf", 16)
     love.graphics.setFont(font)
 end
 
@@ -54,8 +54,8 @@ function editor:update()
         return id_register
     end
     
-    local story = data[story_level].story
-    local options = data[story_level].options
+    local story = data[story_node].story
+    local options = data[story_node].options
     local lw = 80                   -- label width
     
     -- STORY
@@ -78,18 +78,47 @@ function editor:update()
     local function story_right() 
         if story_alt < #story then story_alt = story_alt + 1 end
     end
+    local function story_up() 
+        -- move up a node
+        -- need to look up which is the node above
+        -- there may be multiple options...?
+        -- maybe this button makes no sense either
+        -- maybe node navigation should be via the node map only?
+        -- perhaps I should add something in here temporarily
+        -- or maybe we should go up to the first available
+        -- or maintain a stack and go up to the one we came from
+    end
+    local function story_down() 
+        -- move down a node
+        -- wait this button makes no sense
+        -- and after I spent ages positioning the damn thing...
+        -- this should be overloaded on the 'node' button on the options
+        -- if there is already a node for the option, it should go to that node
+        -- only if no node exists should it make a new node
+    end
 
 	-- put an input widget at the layout origin, with a cell size of 200 by 30 pixels
-	suit.Label("Story (alt"..story_alt..")", suit.layout:row(150, 50))
-    if suit.Button("New Alt", suit.layout:row(150,50)).hit then new_alt_story() end
-    
-    if suit.Button("L", suit.layout:row(75,50)).hit then story_left() end
+	suit.Label("Story", suit.layout:row(150, 25))
     suit.layout:padding(0)
-    if suit.Button("R", suit.layout:col(75,50)).hit then story_right() end
+	suit.Label("(node"..story_node..")(alt"..story_alt..")", suit.layout:row(150, 25))
+    suit.layout:padding(15)
+
+    if suit.Button("New Alt", suit.layout:row(150,40)).hit then new_alt_story() end
+    
+	suit.Label("", suit.layout:row(50, 50))     -- invisible label as spacer
+    suit.layout:padding(0)
+    if suit.Button("U", suit.layout:col(50,50)).hit then story_up() end
+    suit.layout:left(50, 50)
+    if suit.Button("L", suit.layout:row(50,50)).hit then story_left() end
+    suit.layout:padding(50)
+    if suit.Button("R", suit.layout:col(50,50)).hit then story_right() end
+    suit.layout:padding(0)
+    suit.layout:left(50, 50)
+    if suit.Button("D", suit.layout:row(50,50)).hit then story_down() end
     suit.layout:padding(25)
     
-    suit.layout:up(0, 125)
-    suit.layout:right(50, 0)        -- I don't understand why these values work but whatever
+    suit.layout:up(0, 195)
+    suit.layout:right(75, 0)        -- I don't understand why these values work but whatever
     
     suit.Input(story[story_alt].text, suit.layout:col(700,265))
     suit.layout:padding(0)
@@ -102,7 +131,37 @@ function editor:update()
     -- OPTIONS
 	suit.layout:reset(25,350,25)
     
-    --suit.layout:push(suit.layout:nextCol())
+    local function new_node(k)
+        table.insert(data,
+            {
+                story =     
+                {
+                    -- alternate story text at each node
+                    {
+                        id = new_id(),
+                        text =      { {text={""}} }, 
+                        reqs =      { {text={""}} } 
+                    }
+                },
+                
+                options = 
+                {
+                    -- multiple options at each node
+                    {
+                        id = new_id(),
+                        text =      { {text={""}} },
+                        reqs =      { {text={""}} },
+                        results =   { {text={""}} }
+                    }
+                }
+            })
+        
+        local results = options[k].results[1].text[1]
+        results = "node="..#data..";"..results
+        story_node = #data
+    end
+    
+    
     local function delete(which)
         if #options > 1 then
             table.remove(options, which)
@@ -117,7 +176,7 @@ function editor:update()
         table.insert(options,where,options[which])
     end
     
-    local function new()
+    local function new_option()
         table.insert(options, 
             {
                 id =        new_id(),
@@ -174,7 +233,11 @@ function editor:update()
         suit.Input(options[k].results, suit.layout:col(tw,35))
         suit.layout:up(tw,70)
         suit.layout:padding(25)
-        if suit.Button("B", {id="B"..options[k].id}, suit.layout:col(50,105)).hit then delete(k) end
+        if suit.Button("Del", {id="B"..options[k].id}, suit.layout:col(50,52)).hit then delete(k) end
+        suit.layout:padding(0)
+        if suit.Button("New\nNode", {id="N"..options[k].id}, suit.layout:row(50,53)).hit then new_node(k) end
+        suit.layout:up(50,52)
+        suit.layout:padding(25)
         if suit.Button("U", {id="U"..options[k].id}, suit.layout:col(50,52)).hit then up(k) end
         suit.layout:padding(0)
         if suit.Button("D", {id="D"..options[k].id}, suit.layout:row(50,53)).hit then down(k) end
@@ -186,7 +249,7 @@ function editor:update()
     while k <= math.min(#options, 5) do -- we cannot calculate this prior to the loop!!
         suit.layout:reset(25,350+(130*(k-1)),25)
         if k == 1 then
-            if suit.Button("New Option", suit.layout:row(150,70)).hit then new() end
+            if suit.Button("New Option", suit.layout:row(150,70)).hit then new_option() end
         elseif k == 2 and #options > 5 then
             suit.layout:col(50,70)
             suit.layout:padding(0)
