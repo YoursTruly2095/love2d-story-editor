@@ -1,6 +1,7 @@
 -- suit up
 
 local suit = require("suit")
+require("utils")
 
 
 editor = {}
@@ -82,20 +83,26 @@ function editor:update()
         -- move up a node
         -- need to look up which is the node above
         -- there may be multiple options...?
-        -- maybe this button makes no sense either
+        -- maybe this button makes no sense?
         -- maybe node navigation should be via the node map only?
         -- perhaps I should add something in here temporarily
         -- or maybe we should go up to the first available
         -- or maintain a stack and go up to the one we came from
+        
+        -- simple version
+        -- search for any node with any option that leads to the current node
+        for k,v in ipairs(data) do
+            for k2,v2 in ipairs(v.options) do
+                local node = check_status(v2.results.text[1], 'node')
+                if tonumber(node)==story_node then 
+                    story_node=k 
+                    return 
+                end
+            end
+        end
+        
     end
-    local function story_down() 
-        -- move down a node
-        -- wait this button makes no sense
-        -- and after I spent ages positioning the damn thing...
-        -- this should be overloaded on the 'node' button on the options
-        -- if there is already a node for the option, it should go to that node
-        -- only if no node exists should it make a new node
-    end
+    
 
 	-- put an input widget at the layout origin, with a cell size of 200 by 30 pixels
 	suit.Label("Story", suit.layout:row(150, 25))
@@ -112,21 +119,19 @@ function editor:update()
     if suit.Button("L", suit.layout:row(50,50)).hit then story_left() end
     suit.layout:padding(50)
     if suit.Button("R", suit.layout:col(50,50)).hit then story_right() end
-    suit.layout:padding(0)
-    suit.layout:left(50, 50)
-    if suit.Button("D", suit.layout:row(50,50)).hit then story_down() end
+    --suit.layout:padding(0)
+    --suit.layout:left(50, 50)
+    --if suit.Button("D", suit.layout:row(50,50)).hit then story_down() end
     suit.layout:padding(25)
     
-    suit.layout:up(0, 195)
-    suit.layout:right(75, 0)        -- I don't understand why these values work but whatever
+    suit.layout:up(0, 145)
+    suit.layout:right(25, 0)        -- I don't understand why these values work but whatever
     
     suit.Input(story[story_alt].text, suit.layout:col(700,265))
     suit.layout:padding(0)
     suit.Label("reqs",suit.layout:row(lw,35))
     suit.Input(story[story_alt].reqs, suit.layout:col(700-lw,35))
     
-    -- need some 'side to side' scroll button for selection alt story versions
-
     
     -- OPTIONS
 	suit.layout:reset(25,350,25)
@@ -156,12 +161,21 @@ function editor:update()
                 }
             })
         
-        local results = options[k].results[1].text[1]
-        results = "node="..#data..";"..results
+        local results = options[k].results.text[1]
+        options[k].results.text[1] = "node="..#data..";"..results
         story_node = #data
     end
     
-    
+    local function node(k)
+        local results = options[k].results.text[1]
+        local node = check_status(results, "node")
+        if node == nil then
+            new_node(k)
+        else
+            story_node = tonumber(node)
+        end
+    end
+        
     local function delete(which)
         if #options > 1 then
             table.remove(options, which)
@@ -235,7 +249,7 @@ function editor:update()
         suit.layout:padding(25)
         if suit.Button("Del", {id="B"..options[k].id}, suit.layout:col(50,52)).hit then delete(k) end
         suit.layout:padding(0)
-        if suit.Button("New\nNode", {id="N"..options[k].id}, suit.layout:row(50,53)).hit then new_node(k) end
+        if suit.Button("Node", {id="N"..options[k].id}, suit.layout:row(50,53)).hit then node(k) end
         suit.layout:up(50,52)
         suit.layout:padding(25)
         if suit.Button("U", {id="U"..options[k].id}, suit.layout:col(50,52)).hit then up(k) end
