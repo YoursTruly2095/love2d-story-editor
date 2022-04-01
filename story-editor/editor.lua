@@ -385,20 +385,28 @@ function editor:update()
         entry(k+scroll_offset)
         k = k + 1
     end
---[[
+
     -- STORY MAP
+    local map_offset = 920
+    local map_width = 1000
+    local button_width = 100
+    
     local function navigate()
     end
         
-	suit.layout:reset(1000,25,25)
+	
+    suit.layout:reset(map_offset + ((map_width - button_width) / 2) ,25,25)
     
     -- data[1] is always the top level
+    --[[
     for alt = 1, #data[1].story do
         if suit.Button("1."..alt, suit.layout:col(50,50)).hit then navigate("1."..alt) end
     end
-        
+    --]]
+    if suit.Button("1 (1-"..#data[1].story..")", suit.layout:col(button_width,40)).hit then navigate("1") end
+    
     -- for all other nodes, need to work out what the deepest level is
---]]    
+    
 
 end
 
