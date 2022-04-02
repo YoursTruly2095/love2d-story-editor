@@ -43,6 +43,7 @@ local story_node = 1
 local story_alt = 1
 local id_register = 101
 
+local button_locations = {}
 
 function editor:load()
     -- make love use font which support CJK text
@@ -192,7 +193,7 @@ function editor:update()
         for k,v in ipairs(data) do
             for k2,v2 in ipairs(v.options) do
                 local node = check_status(v2.results.text[1], 'node')
-                if tonumber(node)==story_node then 
+                if node==story_node then 
                     story_node=k 
                     story_alt=1
                     return 
@@ -274,7 +275,7 @@ function editor:update()
         if node == nil then
             new_node(k)
         else
-            story_node = tonumber(node)
+            story_node = node
         end
     end
         
@@ -386,32 +387,179 @@ function editor:update()
         k = k + 1
     end
 
+
     -- STORY MAP
     local map_offset = 920
     local map_width = 1000
     local button_width = 100
     
-    local function navigate()
+    local function navigate(node)
+        story_node = node
+        story_alt = 1
     end
         
 	
-    suit.layout:reset(map_offset + ((map_width - button_width) / 2) ,25,25)
     
-    -- data[1] is always the top level
-    --[[
-    for alt = 1, #data[1].story do
-        if suit.Button("1."..alt, suit.layout:col(50,50)).hit then navigate("1."..alt) end
+--[[        
+    if #data > 1 then
+        -- for all other nodes, need to work out what the deepest level is
+        -- this is really problematic because of potential looping
+        local level = {1}
+        for node = 2, #data do
+            -- check which nodes lead to this node
+            for psn in 1, #data do  -- potential source node
+                if psn ~= node then
+                    for k, v in ipairs(data[psn].options) do
+                        local results = v.results.text[1]
+                        local dn = check_status(results, "node")    -- destination node
+                        if dn == node then
+                            -- this potential source node actually is a real source node!
+                            if level[psn] and level[node] == nil or level[node] <= level[psn] then
+                                level[node] = level[psn]+1
+                            end
+                        end
+                    end
+                end
+            end
+        end
+--]]
+        
+        -- try looking at levels instead??
+        -- all nodes that are only sourced from level 1 are at level 2
+        -- if there are no such nodes, but there are still unassigned nodes... oops!
+            -- in this case, pick a node that is accessed from level 1 and call it level 2
+    
+    local node_levels = {}
+
+    if #data > 1 then
+--[[        
+        local unassigned_nodes = {} --#data-1
+        unassigned_nodes[1] = false
+        for n=2,#data do
+            unassigned_nodes[n] = true
+        end
+        
+        local function any_node_unassigned()
+            for _,v in ipairs(unassigned_nodes) do
+                if v == false then return true end
+            end
+            return false
+        end
+--]]        
+        node_levels[1] = 1
+        for n=2,#data do
+            node_levels[n] = '?'
+        end
+        
+        local function any_node_unassigned()
+            for _,v in ipairs(node_levels) do
+                if v == '?' then return true end
+            end
+            return false
+        end
+        
+        local level = 2
+        while any_node_unassigned() do
+            -- search for nodes at the current level
+            -- nodes at the current level are those which only have links from levels above
+            local found_node = false
+            
+            for cn,current_node in ipairs(data) do
+                if node_levels[cn] == '?' then
+                    local potential_level = nil
+                    for psn,potential_source_node in ipairs(data) do
+                        if psn ~= cn then
+                            for o,option in ipairs(potential_source_node.options) do
+                                if potential_level ~= '?' then
+                                    local destination_node = check_status(option.results.text[1], 'node')
+                                    if destination_node == cn then
+                                        -- the potential_source_node is an actual source node!
+                                        -- if the level of the source node is unknown, then our level is unknown
+                                        if node_levels[psn] == '?' then
+                                            potential_level = '?'
+                                            found_node = false
+                                        elseif potential_level == nil or (potential_level < (node_levels[psn]+1)) then
+                                            potential_level = node_levels[psn]+1
+                                            found_node = true
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    
+                    if potential_level == nil then 
+                        --print ("ERROR") 
+                        -- disconnected node
+                        potential_level = 10
+                    end
+                    
+                    node_levels[cn] = potential_level
+                end
+            end
+            
+            if not found_node then
+                -- assign the first unassigned node to the first unused level and carry on
+                local deepest_level = 0
+                for _,v in ipairs(node_levels) do
+                    if v ~= '?' and v>deepest_level then 
+                        deepest_level = v
+                    end
+                end
+                
+                for k,v in ipairs(node_levels) do
+                    if v == '?' then 
+                        node_levels[k]=deepest_level + 1
+                        break
+                    end
+                end
+                
+            end
+            
+                        
+        end
+        
+
     end
-    --]]
-    if suit.Button("1 (1-"..#data[1].story..")", suit.layout:col(button_width,40)).hit then navigate("1") end
+     
+    -- actually draw the map
+    for level = 1, 10 do
     
-    -- for all other nodes, need to work out what the deepest level is
+        local buttons = {}
+           
+        for k,v in ipairs(node_levels) do
+            if v == level then
+                table.insert(buttons, k)
+            end
+        end
+        
+        local offset = (map_width - (button_width*#buttons)) / ((#buttons)+1)
+        suit.layout:reset(map_offset+offset, 25 + (level-1)*100,  offset)
+        for k,v in ipairs(buttons) do
+            button_locations[v]={map_offset+(offset*k)+(button_width*(k-0.5)), 45+(level-1)*100}
+            if suit.Button(v.." (1-"..#data[v].story..")", suit.layout:col(button_width,40)).hit then navigate(v) end
+        end    
+    end
     
 
 end
 
 function editor:draw()
+
+    -- draw lines between buttons to be options
+    for n, node in ipairs(data) do
+        for o, option in ipairs(node.options) do
+            local destination_node = check_status(option.results.text[1], 'node')
+            if destination_node ~= nil and button_locations[n] and button_locations[destination_node] then
+                -- draw an arrow for node to destination_node
+                love.graphics.line(button_locations[n][1],button_locations[n][2]+20,
+                    button_locations[destination_node][1], button_locations[destination_node][2])
+            end
+        end
+    end
+    
     suit.draw()
+
 end
 
 

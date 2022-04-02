@@ -10,7 +10,9 @@ function check_status(status_string, status)
     local statuses = split(status_string, ';')
     for _,v in ipairs(statuses) do
         local s = split(v,'=')
-        if s[1] == status then return s[2] end
+        if s[1] == status then 
+            return tonumber(s[2]) or s[2] 
+        end
     end
     return nil
 end
