@@ -43,6 +43,10 @@ local story_node = 1
 local story_alt = 1
 local id_register = 101
 
+local mode = 'normal'
+local normal_mode = 'edit'
+local player_status = { text={""} }
+
 local button_locations = {}
 
 function editor:load()
@@ -136,11 +140,28 @@ function editor:update()
         if suit.Button("Cancel", suit.layout:row(150,70)).hit then mode = 'normal' end
     end
     
+    local function quit_screen()
+        
+        local function quit()
+            love.event.quit()
+        end
+        
+        suit.layout:reset(25,25,25)
+        suit.Label("All unsaved data will be lost upon quit!",suit.layout:col(900,40))
+        
+        -- save and cancel buttons
+        suit.layout:reset(25,870,25)
+        if suit.Button("Quit", suit.layout:row(150,70)).hit then quit() end
+        if suit.Button("Cancel", suit.layout:row(150,70)).hit then mode = 'normal' end
+    end
+        
+    
     if mode == 'load' then load_screen() return end
     if mode == 'saveas' then save_screen() return end
+    if mode == 'quit' then quit_screen() return end
     
     -- NORMAL MODE
-	-- load and save buttons
+    -- load and save buttons
     suit.layout:reset(25,900,15)
     if suit.Button("Load", suit.layout:row(150,40)).hit then mode = 'load' end
     if suit.Button("Save", suit.layout:row(150,40)).hit then save_file() end
@@ -152,241 +173,312 @@ function editor:update()
     suit.Label(filename, {align='left'}, suit.layout:col(600,40))
     suit.layout:padding(25)
     
-    local function new_id()
-        id_register = id_register + 1
-        return id_register
-    end
-    
+    -- quit button
+    suit.layout:reset(800,1000,15)
+    if suit.Button("Quit", suit.layout:row(150,40)).hit then mode = 'quit' end
+        
     local story = data[story_node].story
     local options = data[story_node].options
     local lw = 80                   -- label width
     
-    -- STORY
-    local function new_alt_story() 
-        table.insert(story, 
-            {
-                id =        new_id(),
-                text =      { {text={""}} },
-                reqs =      { {text={""}} },
-            })
-        story_alt = #story
-    end
-
-    local function story_left() 
-        if story_alt > 1 then story_alt = story_alt - 1 end
-    end
-    local function story_right() 
-        if story_alt < #story then story_alt = story_alt + 1 end
-    end
-    local function story_up() 
-        -- move up a node
-        -- need to look up which is the node above
-        -- there may be multiple options...?
-        -- maybe this button makes no sense?
-        -- maybe node navigation should be via the node map only?
-        -- perhaps I should add something in here temporarily
-        -- or maybe we should go up to the first available
-        -- or maintain a stack and go up to the one we came from
+    if normal_mode == 'play' then
         
-        -- simple version
-        -- search for any node with any option that leads to the current node
-        for k,v in ipairs(data) do
-            for k2,v2 in ipairs(v.options) do
-                local node = check_status(v2.results.text[1], 'node')
-                if node==story_node then 
-                    story_node=k 
-                    story_alt=1
-                    return 
+        local function pick_alt()
+            
+            -- default
+            story_alt = 1
+            
+            if #story > 1 then
+                for n=2,#story do
+                    local meets_reqs = true
+                    local reqs = split(story[n].reqs.text[1],';')
+                    for k,v in ipairs(reqs) do
+                        local req = split(v,'=')
+                        req[2] = tonumber(req[2]) or req[2]
+                        if req[2] ~= check_status(player_status.text[1], req[1]) then
+                            meets_reqs = false
+                        end
+                    end
+                    
+                    if meets_reqs then
+                        story_alt = n
+                    end
+                end
+            end
+            
+        end
+        
+        -- play instead of editing
+        -- edit mode button
+        suit.layout:reset(600,1000,15)
+        if suit.Button("Edit", suit.layout:row(150,40)).hit then normal_mode = 'edit' end
+        suit.layout:reset(400,1000,15)
+        if suit.Button("Reset", suit.layout:row(150,40)).hit then story_node = 1 end
+        
+        -- the layout will grow down and to the right from this point
+        suit.layout:reset(25,25,25)
+        suit.Label("Player", suit.layout:row(150, 25))
+        suit.layout:padding(0)
+        suit.Label("Status", suit.layout:row(150, 25))
+        suit.layout:up(0,25)
+        suit.layout:right(175,0)    
+        suit.Input(player_status, suit.layout:col(700,265))
+        
+        suit.layout:reset(25,320,25)
+        suit.Label("Story", suit.layout:row(150, 25))
+        suit.layout:padding(0)
+        suit.Label("(node"..story_node..")(alt"..story_alt..")", suit.layout:row(150, 25))
+        suit.layout:up(0,25)
+        suit.layout:right(175,0)    
+        -- pick the story alt depending on the player status
+        pick_alt()
+        suit.Input(story[story_alt].text, suit.layout:col(700,265))
+
+        suit.layout:reset(25,615,25)
+        suit.Label("Options", suit.layout:row(150, 25))
+        suit.layout:reset(200,615,0)
+        for k,v in ipairs(options) do
+            -- only add options if the player status is appropriate
+            if suit.Button(v.text.text[1], suit.layout:row(700,35)).hit then do_option(k) end
+        end
+
+    else
+        -- play mode button
+        suit.layout:reset(600,1000,15)
+        if suit.Button("Play", suit.layout:row(150,40)).hit then normal_mode = 'play' end
+        
+        local function new_id()
+            id_register = id_register + 1
+            return id_register
+        end
+        
+        
+        -- STORY
+        local function new_alt_story() 
+            table.insert(story, 
+                {
+                    id =        new_id(),
+                    text =      { {text={""}} },
+                    reqs =      { {text={""}} },
+                })
+            story_alt = #story
+        end
+
+        local function story_left() 
+            if story_alt > 1 then story_alt = story_alt - 1 end
+        end
+        local function story_right() 
+            if story_alt < #story then story_alt = story_alt + 1 end
+        end
+        local function story_up() 
+            -- move up a node
+            -- need to look up which is the node above
+            -- there may be multiple options...?
+            -- maybe this button makes no sense?
+            -- maybe node navigation should be via the node map only?
+            -- perhaps I should add something in here temporarily
+            -- or maybe we should go up to the first available
+            -- or maintain a stack and go up to the one we came from
+            
+            -- simple version
+            -- search for any node with any option that leads to the current node
+            for k,v in ipairs(data) do
+                for k2,v2 in ipairs(v.options) do
+                    local node = check_status(v2.results.text[1], 'node')
+                    if node==story_node then 
+                        story_node=k 
+                        story_alt=1
+                        return 
+                    end
+                end
+            end
+       
+        end
+        
+        -- the layout will grow down and to the right from this point
+        suit.layout:reset(25,25,25)
+        
+        -- put an input widget at the layout origin, with a cell size of 200 by 30 pixels
+        suit.Label("Story", suit.layout:row(150, 25))
+        suit.layout:padding(0)
+        suit.Label("(node"..story_node..")(alt"..story_alt..")", suit.layout:row(150, 25))
+        suit.layout:padding(15)
+
+        if suit.Button("New Alt", suit.layout:row(150,40)).hit then new_alt_story() end
+        
+        suit.Label("", suit.layout:row(50, 50))     -- invisible label as spacer
+        suit.layout:padding(0)
+        if suit.Button("U", suit.layout:col(50,50)).hit then story_up() end
+        suit.layout:left(50, 50)
+        if suit.Button("L", suit.layout:row(50,50)).hit then story_left() end
+        suit.layout:padding(50)
+        if suit.Button("R", suit.layout:col(50,50)).hit then story_right() end
+        --suit.layout:padding(0)
+        --suit.layout:left(50, 50)
+        --if suit.Button("D", suit.layout:row(50,50)).hit then story_down() end
+        suit.layout:padding(25)
+        
+        suit.layout:up(0, 145)
+        suit.layout:right(25, 0)        -- I don't understand why these values work but whatever
+        
+        suit.Input(story[story_alt].text, suit.layout:col(700,265))
+        suit.layout:padding(0)
+        suit.Label("reqs",suit.layout:row(lw,35))
+        suit.Input(story[story_alt].reqs, suit.layout:col(700-lw,35))
+        
+        
+        -- OPTIONS
+        local options_to_display=4
+        
+        local function new_node(k)
+            table.insert(data,
+                {
+                    story =     
+                    {
+                        -- alternate story text at each node
+                        {
+                            id = new_id(),
+                            text =      { text={""} }, 
+                            reqs =      { text={""} } 
+                        }
+                    },
+                    
+                    options = 
+                    {
+                        -- multiple options at each node
+                        {
+                            id = new_id(),
+                            text =      { text={""} },
+                            reqs =      { text={""} },
+                            results =   { text={""} }
+                        }
+                    }
+                })
+            
+            local results = options[k].results.text[1]
+            options[k].results.text[1] = "node="..#data..";"..results
+            story_node = #data
+            story_alt = 1
+        end
+        
+        local function node(k)
+            local results = options[k].results.text[1]
+            local node = check_status(results, "node")
+            if node == nil then
+                new_node(k)
+            else
+                story_node = node
+            end
+        end
+            
+        local function delete(which)
+            if #options > 1 then
+                table.remove(options, which)
+                
+                -- fix scroll offset
+                if scroll_offset > #options-options_to_display then scroll_offset = #options-options_to_display end
+                if scroll_offset < 0 then scroll_offset = 0 end
+            end
+        end
+        
+        local function insert(where,which)
+            table.insert(options,where,options[which])
+        end
+        
+        local function new_option()
+            table.insert(options, 
+                {
+                    id =        new_id(),
+                    text =      { {text={""}} },
+                    reqs =      { {text={""}} },
+                    results =   { {text={""}} }
+                })
+                
+            -- set the scroll offset so the new option is visible
+            scroll_offset = #options-options_to_display
+            if scroll_offset < 0 then scroll_offset = 0 end
+        end
+        
+        local function up(k)
+            if k > 1  and #options > 1 then
+                insert(k-1, k)
+                delete(k+1)
+            end
+        end
+        
+        local function down(k)
+            if k < #options and #options > 1 then
+                insert(k+2, k)
+                delete(k)
+            end
+        end
+        
+        local function scroll(dir)
+            if dir == 'up' then
+                if scroll_offset > 0 then
+                    scroll_offset = scroll_offset - 1
+                end
+            else
+                if scroll_offset < #options-options_to_display then
+                    scroll_offset = scroll_offset + 1
                 end
             end
         end
-   
-    end
-    
-	-- the layout will grow down and to the right from this point
-	suit.layout:reset(25,25,25)
-    
-	-- put an input widget at the layout origin, with a cell size of 200 by 30 pixels
-	suit.Label("Story", suit.layout:row(150, 25))
-    suit.layout:padding(0)
-	suit.Label("(node"..story_node..")(alt"..story_alt..")", suit.layout:row(150, 25))
-    suit.layout:padding(15)
-
-    if suit.Button("New Alt", suit.layout:row(150,40)).hit then new_alt_story() end
-    
-	suit.Label("", suit.layout:row(50, 50))     -- invisible label as spacer
-    suit.layout:padding(0)
-    if suit.Button("U", suit.layout:col(50,50)).hit then story_up() end
-    suit.layout:left(50, 50)
-    if suit.Button("L", suit.layout:row(50,50)).hit then story_left() end
-    suit.layout:padding(50)
-    if suit.Button("R", suit.layout:col(50,50)).hit then story_right() end
-    --suit.layout:padding(0)
-    --suit.layout:left(50, 50)
-    --if suit.Button("D", suit.layout:row(50,50)).hit then story_down() end
-    suit.layout:padding(25)
-    
-    suit.layout:up(0, 145)
-    suit.layout:right(25, 0)        -- I don't understand why these values work but whatever
-    
-    suit.Input(story[story_alt].text, suit.layout:col(700,265))
-    suit.layout:padding(0)
-    suit.Label("reqs",suit.layout:row(lw,35))
-    suit.Input(story[story_alt].reqs, suit.layout:col(700-lw,35))
-    
-    
-    -- OPTIONS
-    local options_to_display=4
-    
-    local function new_node(k)
-        table.insert(data,
-            {
-                story =     
-                {
-                    -- alternate story text at each node
-                    {
-                        id = new_id(),
-                        text =      { text={""} }, 
-                        reqs =      { text={""} } 
-                    }
-                },
+        
                 
-                options = 
-                {
-                    -- multiple options at each node
-                    {
-                        id = new_id(),
-                        text =      { text={""} },
-                        reqs =      { text={""} },
-                        results =   { text={""} }
-                    }
-                }
-            })
+                
         
-        local results = options[k].results.text[1]
-        options[k].results.text[1] = "node="..#data..";"..results
-        story_node = #data
-        story_alt = 1
-    end
-    
-    local function node(k)
-        local results = options[k].results.text[1]
-        local node = check_status(results, "node")
-        if node == nil then
-            new_node(k)
-        else
-            story_node = node
-        end
-    end
+        local tw = 700-50-50-25-25-80   -- text width
         
-    local function delete(which)
-        if #options > 1 then
-            table.remove(options, which)
-            
-            -- fix scroll offset
-            if scroll_offset > #options-options_to_display then scroll_offset = #options-options_to_display end
-            if scroll_offset < 0 then scroll_offset = 0 end
-        end
-    end
-    
-    local function insert(where,which)
-        table.insert(options,where,options[which])
-    end
-    
-    local function new_option()
-        table.insert(options, 
-            {
-                id =        new_id(),
-                text =      { {text={""}} },
-                reqs =      { {text={""}} },
-                results =   { {text={""}} }
-            })
-            
-        -- set the scroll offset so the new option is visible
-        scroll_offset = #options-options_to_display
-        if scroll_offset < 0 then scroll_offset = 0 end
-    end
-    
-    local function up(k)
-        if k > 1  and #options > 1 then
-            insert(k-1, k)
-            delete(k+1)
-        end
-    end
-    
-    local function down(k)
-        if k < #options and #options > 1 then
-            insert(k+2, k)
-            delete(k)
-        end
-    end
-    
-    local function scroll(dir)
-        if dir == 'up' then
-            if scroll_offset > 0 then
-                scroll_offset = scroll_offset - 1
-            end
-        else
-            if scroll_offset < #options-options_to_display then
-                scroll_offset = scroll_offset + 1
-            end
-        end
-    end
-    
-            
-            
-    
-    local tw = 700-50-50-25-25-80   -- text width
-    
-	suit.layout:reset(25,350,25)
-    
-    local function entry(k)
-        suit.Label("opt"..k,suit.layout:col(lw,35))
-        suit.layout:padding(0)
-        suit.Input(options[k].text, suit.layout:col(tw,35))
-        suit.layout:left(lw)
-        suit.Label("reqs",suit.layout:row(lw,35))
-        suit.Input(options[k].reqs, suit.layout:col(tw,35))
-        suit.layout:left(lw)
-        suit.Label("result",suit.layout:row(lw,35))
-        suit.Input(options[k].results, suit.layout:col(tw,35))
-        suit.layout:up(tw,70)
-        suit.layout:padding(25)
+        suit.layout:reset(25,350,25)
         
-        -- check out the horrible construct below
-        -- we're using 'else' to make sure we don;t process the other buttons if one actually gets hit
-        if suit.Button("Del", {id="B"..options[k].id}, suit.layout:col(50,52)).hit then delete(k) else
-        suit.layout:padding(0)
-        if suit.Button("Node", {id="N"..options[k].id}, suit.layout:row(50,53)).hit then node(k) else
-        suit.layout:up(50,52)
-        suit.layout:padding(25)
-        if suit.Button("U", {id="U"..options[k].id}, suit.layout:col(50,52)).hit then up(k) else
-        suit.layout:padding(0)
-        if suit.Button("D", {id="D"..options[k].id}, suit.layout:row(50,53)).hit then down(k) end end end end
-    end
-
-    -- this must be a while loop not a for loop, because the BIN button 
-    -- can change the length of value of #options
-    local k=1
-    while k <= math.min(#options, options_to_display) do -- we cannot calculate this prior to the loop!!
-        suit.layout:reset(25,350+(130*(k-1)),25)
-        if k == 1 then
-            if suit.Button("New Option", suit.layout:row(150,70)).hit then new_option() end
-        elseif k == 2 and #options > options_to_display then
-            suit.layout:col(50,70)
+        local function entry(k)
+            suit.Label("opt"..k,suit.layout:col(lw,35))
             suit.layout:padding(0)
-            if suit.Button("SU", suit.layout:col(50,52)).hit then scroll('up') end
-            if suit.Button("SD", suit.layout:row(50,53)).hit then scroll('down') end
-            suit.layout:up(50,53)
-            suit.layout:col(50,70)
+            suit.Input(options[k].text, suit.layout:col(tw,35))
+            suit.layout:left(lw)
+            suit.Label("reqs",suit.layout:row(lw,35))
+            suit.Input(options[k].reqs, suit.layout:col(tw,35))
+            suit.layout:left(lw)
+            suit.Label("result",suit.layout:row(lw,35))
+            suit.Input(options[k].results, suit.layout:col(tw,35))
+            suit.layout:up(tw,70)
             suit.layout:padding(25)
-        else
-            suit.layout:row(150,70)
+            
+            -- check out the horrible construct below
+            -- we're using 'else' to make sure we don;t process the other buttons if one actually gets hit
+            if suit.Button("Del", {id="B"..options[k].id}, suit.layout:col(50,52)).hit then delete(k) else
+            suit.layout:padding(0)
+            if suit.Button("Node", {id="N"..options[k].id}, suit.layout:row(50,53)).hit then node(k) else
+            suit.layout:up(50,52)
+            suit.layout:padding(25)
+            if suit.Button("U", {id="U"..options[k].id}, suit.layout:col(50,52)).hit then up(k) else
+            suit.layout:padding(0)
+            if suit.Button("D", {id="D"..options[k].id}, suit.layout:row(50,53)).hit then down(k) end end end end
         end
-        entry(k+scroll_offset)
-        k = k + 1
-    end
 
+        -- this must be a while loop not a for loop, because the BIN button 
+        -- can change the length of value of #options
+        local k=1
+        while k <= math.min(#options, options_to_display) do -- we cannot calculate this prior to the loop!!
+            suit.layout:reset(25,350+(130*(k-1)),25)
+            if k == 1 then
+                if suit.Button("New Option", suit.layout:row(150,70)).hit then new_option() end
+            elseif k == 2 and #options > options_to_display then
+                suit.layout:col(50,70)
+                suit.layout:padding(0)
+                if suit.Button("SU", suit.layout:col(50,52)).hit then scroll('up') end
+                if suit.Button("SD", suit.layout:row(50,53)).hit then scroll('down') end
+                suit.layout:up(50,53)
+                suit.layout:col(50,70)
+                suit.layout:padding(25)
+            else
+                suit.layout:row(150,70)
+            end
+            entry(k+scroll_offset)
+            k = k + 1
+        end
+    end -- edit mode
 
     -- STORY MAP
     local map_offset = 920
