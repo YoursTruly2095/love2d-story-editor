@@ -184,41 +184,58 @@ function editor:update()
     if normal_mode == 'play' then
         
         local function pick_alt()
+            story_alt = 1           -- default
             
-            -- default
-            story_alt = 1
-            
+            -- the last alternative that satisfies requirements is picked
             if #story > 1 then
                 for n=2,#story do
---[[                    
-                    local meets_reqs = true
-                    local reqs = split(story[n].reqs.text[1],';')
-                    for k,v in ipairs(reqs) do
-                        local req = split(v,'=')
-                        req[2] = tonumber(req[2]) or req[2]
-                        if req[2] ~= check_status(player_status.text[1], req[1]) then
-                            meets_reqs = false
-                        end
-                    end
-                    
-                    if meets_reqs then
-                        story_alt = n
-                    end
---]]
                     if check_reqs(story[n].reqs.text[1],player_status.text[1])  then
                         story_alt = n
                     end
-                    
-
                 end
             end
-            
         end
         
         local function check_option(opt)
             return check_reqs(opt.reqs.text[1],player_status.text[1]) 
         end
         
+        local function do_option(opt) 
+            
+            -- apply results
+            local _results = split(opt.results.text[1], ';')
+            local _status = split(player_status.text[1], ';')
+            local results = {}
+            local status = {}
+            
+            for _,_v in ipairs(_results) do
+                local t = split(_v,'=')
+                if t[1] ~= 'node' then results[t[1]]=t[2] end
+            end
+            
+            for _,_v in ipairs(_status) do
+                local t = split(_v,'=')
+                status[t[1]]=t[2]
+            end
+            
+            for k,result in pairs(results) do
+                if status[k] == nil then 
+                    status[k] = result 
+                else
+                    status[k] = tostring(status[k]+result)
+                end
+            end
+
+            local status_string = ""
+            for k,v in pairs(status) do
+                status_string = status_string ..k.."="..v..";"
+            end
+            player_status.text[1] = status_string
+            
+            local new_node = check_status(opt.results.text[1], 'node')
+            if new_node then story_node = new_node end
+            
+        end
         
         -- play instead of editing
         -- edit mode button
@@ -252,7 +269,7 @@ function editor:update()
         for k,v in ipairs(options) do
             -- only add options if the player status is appropriate
             if check_option(v) then
-                if suit.Button(v.text.text[1], suit.layout:row(700,35)).hit then do_option(k) end
+                if suit.Button(v.text.text[1], suit.layout:row(700,35)).hit then do_option(v) end
             end
         end
 
