@@ -459,9 +459,27 @@ do
             for k,v in ipairs(input.selection) do
                 print(v)
             end            
+            
+            -- write the data to the system clipboard
+            local clipboard_string = input.selection[1]
+            for k,v in ipairs(input.selection) do
+                if k > 1 then
+                    clipboard_string = clipboard_string.."\n"..v
+                end
+            end    
+            love.system.setClipboardText(clipboard_string)
+            
         end
         
         local function insert_selection()
+            -- import data from the system clipboard
+            local clipboard_string = love.system.getClipboardText()
+            if clipboard_string then
+                input.selection = {}
+                for s in string.gmatch(clipboard_string, "([^\n]+)") do
+                    table.insert(input.selection, s)
+                end
+            end
             if not input.selection then return end
             local line, pos = input.cursorline, input.cursor
             local s,e = input.text[line]:sub(1,pos-1),input.text[line]:sub(pos)
