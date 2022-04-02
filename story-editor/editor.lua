@@ -190,6 +190,7 @@ function editor:update()
             
             if #story > 1 then
                 for n=2,#story do
+--[[                    
                     local meets_reqs = true
                     local reqs = split(story[n].reqs.text[1],';')
                     for k,v in ipairs(reqs) do
@@ -203,10 +204,21 @@ function editor:update()
                     if meets_reqs then
                         story_alt = n
                     end
+--]]
+                    if check_reqs(story[n].reqs.text[1],player_status.text[1])  then
+                        story_alt = n
+                    end
+                    
+
                 end
             end
             
         end
+        
+        local function check_option(opt)
+            return check_reqs(opt.reqs.text[1],player_status.text[1]) 
+        end
+        
         
         -- play instead of editing
         -- edit mode button
@@ -239,7 +251,9 @@ function editor:update()
         suit.layout:reset(200,615,0)
         for k,v in ipairs(options) do
             -- only add options if the player status is appropriate
-            if suit.Button(v.text.text[1], suit.layout:row(700,35)).hit then do_option(k) end
+            if check_option(v) then
+                if suit.Button(v.text.text[1], suit.layout:row(700,35)).hit then do_option(k) end
+            end
         end
 
     else
