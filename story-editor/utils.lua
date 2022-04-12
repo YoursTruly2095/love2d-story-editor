@@ -21,14 +21,14 @@ end
    
 
 local function split_op(req_table, req, op)
-    local op_table
-    op_table = split(req, op)
-    if op_table[1] ~= req then      -- if the operator was actually found
-        op_table[2] = tonumber(op_table[2]) or op_table[2]
-        if op_table[2]=='nil' then op_table[2]=nil end                        -- allow the string 'nil'
-        req_table[op_table[1]] = {}
-        req_table[op_table[1]].val = op_table[2]
-        req_table[op_table[1]].op = op
+    local s,e = req:find(op,1,true)             -- plain string match
+    if s then
+        local key = req:sub(1,s-1)
+        local val = req:sub(e+1)
+        val = tonumber(val) or nil
+        req_table[key] = {}
+        req_table[key].val = val
+        req_table[key].op = op
         return true
     end
     return false
@@ -45,9 +45,9 @@ end
 
 function decode_results(req_table, req)
     if not (
-        split_op(req_table, req, '=') or
         split_op(req_table, req, '+=') or
         split_op(req_table, req, '-=') or
+        split_op(req_table, req, '=') or        -- must go after += and -= to avoid paring issues
         split_op(req_table, req, '++') or
         split_op(req_table, req, '--') ) then
         print("Error could not decode result "..req)
