@@ -189,7 +189,10 @@ function editor:update()
             -- the last alternative that satisfies requirements is picked
             if #story > 1 then
                 for n=2,#story do
-                    if check_reqs(story[n].reqs.text[1],player_status.text[1])  then
+                    local reqs = convert_op_string(story[n].reqs.text[1], decode_req)
+                    local status = convert_op_string(player_status.text[1], decode_status)
+                    
+                    if check_reqs(reqs,status)  then
                         story_alt = n
                     end
                 end
@@ -197,12 +200,15 @@ function editor:update()
         end
         
         local function check_option(opt)
-            return check_reqs(opt.reqs.text[1],player_status.text[1]) 
+            local reqs = convert_op_string(opt.reqs.text[1], decode_req)
+            local status = convert_op_string(player_status.text[1], decode_status)
+            return check_reqs(reqs,status) 
         end
         
         local function do_option(opt) 
             
             -- apply results
+--[[
             local _results = split(opt.results.text[1], ';')
             local _status = split(player_status.text[1], ';')
             local results = {}
@@ -210,14 +216,27 @@ function editor:update()
             
             for _,_v in ipairs(_results) do
                 local t = split(_v,'=')
-                if t[1] ~= 'node' then results[t[1]]=t[2] end
+                if t[1] ~= 'node' then results[t[1] ]=t[2] end
             end
             
             for _,_v in ipairs(_status) do
                 local t = split(_v,'=')
-                status[t[1]]=t[2]
+                status[t[1] ]=t[2]
+            end
+--]]            
+            local results = convert_op_string(opt.results.text[1], decode_results)
+            local status = convert_op_string(player_status.text[1], decode_status)
+            
+            if results.node then 
+                story_node = results.node.val
+                results.node = nil
             end
             
+            
+            status = apply_results(status, results)
+            
+--[[    
+           
             for k,result in pairs(results) do
                 if status[k] == nil then 
                     status[k] = result 
@@ -225,16 +244,16 @@ function editor:update()
                     status[k] = tostring(status[k]+result)
                 end
             end
-
+--]]
             local status_string = ""
             for k,v in pairs(status) do
-                status_string = status_string ..k.."="..v..";"
+                status_string = status_string..k..v.op..v.val..";"
             end
             player_status.text[1] = status_string
-            
+--[[            
             local new_node = check_status(opt.results.text[1], 'node')
             if new_node then story_node = new_node end
-            
+--]]            
         end
         
         -- play instead of editing

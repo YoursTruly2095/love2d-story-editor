@@ -6,6 +6,7 @@ function split(str, sep)
     return t
 end
 
+
 function check_status(status_string, status)
     local statuses = split(status_string, ';')
     for _,v in ipairs(statuses) do
@@ -16,21 +17,98 @@ function check_status(status_string, status)
     end
     return nil
 end
-        
-function check_reqs(reqs_string, player_status_string)
-    local meets_reqs = true
+   
+   
+
+local function split_op(req_table, req, op)
+    local op_table
+    op_table = split(req, op)
+    if op_table[1] ~= req then      -- if the operator was actually found
+        op_table[2] = tonumber(op_table[2]) or op_table[2]
+        if op_table[2]=='nil' then op_table[2]=nil end                        -- allow the string 'nil'
+        req_table[op_table[1]] = {}
+        req_table[op_table[1]].val = op_table[2]
+        req_table[op_table[1]].op = op
+        return true
+    end
+    return false
+end
+
+function decode_req(req_table, req)
+    if not ( 
+        split_op(req_table, req, '==') or
+        split_op(req_table, req, '>') or
+        split_op(req_table, req, '<') ) then
+        print("Error could not decode requirement "..req)
+    end
+end
+
+function decode_results(req_table, req)
+    if not (
+        split_op(req_table, req, '=') or
+        split_op(req_table, req, '+=') or
+        split_op(req_table, req, '-=') or
+        split_op(req_table, req, '++') or
+        split_op(req_table, req, '--') ) then
+        print("Error could not decode result "..req)
+    end
+end
+
+function decode_status(req_table, req)
+    if not ( 
+        split_op(req_table, req, '=') ) then
+        print("Error could not decode status "..req)
+    end
+end
+
+function convert_op_string(reqs_string, decode_fn)
     local reqs = split(reqs_string,';')
-    for k,v in ipairs(reqs) do
-        local req = split(v,'=')
-        req[2] = tonumber(req[2]) or req[2]
-        if req[2]=='nil' then req[2]=nil end                        -- allow the string 'nil'
-        local status = check_status(player_status_string, req[1])
-        if status==nil then if req[2]==0 then req[2]=nil end end    -- allow 0 to match nil and visa versa
-        if req[2] ~= status then
-            meets_reqs = false
-        end
+    local req_table = {}
+    for _,v in ipairs(reqs) do
+        decode_fn(req_table, v)
+    end
+    return req_table
+end
+
+function check_reqs(reqs, player_status)
+    local meets_reqs = true
+    for k,req in pairs(reqs) do
+        local status = nil
+        if player_status[k] then status = player_status[k].val end
+        if status==nil then status=0 end     -- allow 0 to match nil and visa versa
+        
+        if req.op == '==' and req.val ~= status then meets_reqs = false end
+        if req.op == '>' and status <= req.val then meets_reqs = false end
+        if req.op == '<' and status >= req.val then meets_reqs = false end
+    
     end
     return meets_reqs
+end
+
+        
+function apply_results(status, results)
+    
+    for k,result in pairs(results) do
+        if status[k] == nil then 
+            status[k] = {}
+            status[k].val = 0
+            status[k].op = '='
+        end
+        if result.op == '=' then
+            status[k].val = result.val
+        elseif result.op == '+=' then
+            status[k].val = status[k].val + result.val
+        elseif result.op == '-=' then
+            status[k].val = status[k].val - result.val
+        elseif result.op == '++' then
+            status[k].val = status[k].val + 1
+        elseif result.op == '--' then
+            status[k].val = status[k].val - 1
+        end
+    end
+    
+    return status
+
 end
 
         
