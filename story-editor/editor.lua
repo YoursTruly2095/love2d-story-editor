@@ -57,6 +57,7 @@ function editor:load()
     -- make love use font which support CJK text
     local font = love.graphics.newFont("Courier Prime.ttf", 16)
     love.graphics.setFont(font)
+    love.keyboard.setKeyRepeat(true)
 end
 
 function editor:update()
