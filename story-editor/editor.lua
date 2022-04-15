@@ -632,8 +632,8 @@ function editor:update()
                     
                     if potential_level == nil then 
                         --print ("ERROR") 
-                        -- disconnected node
-                        potential_level = 10
+                        -- disconnected node, put at the top 
+                        potential_level = 1
                     end
                     
                     node_levels[cn] = potential_level
