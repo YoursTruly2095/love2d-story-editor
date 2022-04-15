@@ -12,6 +12,10 @@ local data =
 {
     -- story nodes
     {
+--        display_level = { {text={""}} },
+        display_level = {},
+        display_offset = {},
+        
         story =     
         {
             -- alternate story text at each node
@@ -71,6 +75,22 @@ function editor:update()
             story_alt = 1
             -- need to update the id register too
             mode = 'normal'
+        end
+        
+        for n,node in pairs(data) do
+            -- file conversion
+            if not node.display_level then node.display_level = {} end
+            if not node.display_offset then node.display_offset = {} end
+            
+            -- id_register update
+            for s,story in pairs(node.story) do
+                if story.id >= id_register then id_register = story.id + 1 end
+            end
+            
+            for o,opt in pairs(node.options) do
+                if opt.id >= id_register then id_register = opt.id + 1 end
+            end
+            
         end
     end
         
@@ -366,13 +386,21 @@ function editor:update()
         --suit.layout:padding(0)
         --suit.layout:left(50, 50)
         --if suit.Button("D", suit.layout:row(50,50)).hit then story_down() end
-        suit.layout:padding(25)
+        suit.layout:padding(15)
         
-        suit.layout:up(0, 145)
-        suit.layout:right(25, 0)        -- I don't understand why these values work but whatever
+        suit.layout:left(100, 50)        -- I don't understand why these values work but whatever
+        suit.Label("lvl",suit.layout:row(35,35))
+        suit.layout:padding(0)
+        suit.Input(data[story_node].display_level, suit.layout:col(35,35))
+        suit.layout:padding(10)
+        suit.Label("off",suit.layout:col(35,35))
+        suit.layout:padding(0)
+        suit.Input(data[story_node].display_offset, suit.layout:col(50,35))
+        
+        suit.layout:up(0, 245)
+        suit.layout:right(75, 0)        -- I don't understand why these values work but whatever
         
         suit.Input(story[story_alt].text, suit.layout:col(700,265))
-        suit.layout:padding(0)
         suit.Label("reqs",suit.layout:row(lw,35))
         suit.Input(story[story_alt].reqs, suit.layout:col(700-lw,35))
         
@@ -590,7 +618,9 @@ function editor:update()
 --]]        
         node_levels[1] = 1
         for n=2,#data do
-            node_levels[n] = '?'
+            local level = nil
+            if data[n].display_level and data[n].display_level.text then level = tonumber(data[n].display_level.text[1]) end
+            node_levels[n] = level or '?'
         end
         
         local function any_node_unassigned()
@@ -674,11 +704,19 @@ function editor:update()
                 table.insert(buttons, k)
             end
         end
+            
+        local gap_width = (map_width - (button_width*#buttons)) / ((#buttons)+1)
         
-        local offset = (map_width - (button_width*#buttons)) / ((#buttons)+1)
-        suit.layout:reset(map_offset+offset, 25 + (level-1)*100,  offset)
         for k,v in ipairs(buttons) do
-            button_locations[v]={map_offset+(offset*k)+(button_width*(k-0.5)), 45+(level-1)*100}
+            
+            local offset = map_offset + (gap_width*k) + (button_width*(k-1))
+            
+            local display_offset
+            if data[v].display_offset and data[v].display_offset.text then display_offset = tonumber(data[v].display_offset.text[1]) end
+            display_offset = (display_offset or 0) * 10
+            
+            suit.layout:reset(offset+display_offset, 25 + (level-1)*100)
+            button_locations[v]={offset+(button_width*0.5)+display_offset, 45+(level-1)*100}
             if suit.Button(v.." (1-"..#data[v].story..")", suit.layout:col(button_width,40)).hit then navigate(v) end
         end    
     end
