@@ -7,7 +7,7 @@ selected based on the player's status. Which options are available is also contr
 by player status, and selecting an option can cause player status to be updated.
 
 Player status variables are keys (arbitrary strings) associated with integer values. 
-Alternate node text and options can check for a player status being ==, < or > a 
+Alternate node text and options can check for a player status being ==, < or >, a 
 specific number. In the case of node text, the last text where the player status 
 meets all requirements will be displayed. In the case of options, all options where 
 the player status meets the option requirements will be displayed.
@@ -22,9 +22,15 @@ Stories can be saved to file and loaded from file. It is envisioned that stories
 in the editor could be loaded into a love2d based game.
 
 The editor has a play mode that allows the stories to be played. During play mode, you 
-can freely edit the player status to simulate other events happening in a actual game.
+can freely edit the player status to simulate other events happening in an actual game.
 
 The editor shows a basic graphical map of the story tree.
+
+Options can be deleted with their own delete button. The delete button for the story will
+remove the current story alternative, or if there is only 1 story alternative the node
+itself will be removed. In that case, all options are lost, and all nodes with a higher
+node number get renumbered. The editor automatically fixes all links to nodes that get
+renumbered in this way.
 
 Uses a hacked up version of https://github.com/HTV04/suit-compact, with a lot of changes 
 for multiline editing and cut / paste. I know I should improve my git-fu so that I could

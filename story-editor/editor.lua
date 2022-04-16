@@ -238,7 +238,8 @@ function editor:update()
                 if data[results.node.val] then 
                     story_node = results.node.val 
                 else
-                    print("Tried to go to non-existent node "..results.node.val)
+                    local node = results.node.val or '?'
+                    print("Tried to go to non-existent node "..node)
                 end
                 results.node = nil
             end
@@ -311,35 +312,52 @@ function editor:update()
             story_alt = #story
         end
 
+        local function delete_story()
+            if #story == 1 then
+                -- there is only 1 alt, we are deleting the entire node, 
+                -- but don't let the last node be deleted
+                if #data > 1 then
+                    table.remove(data, story_node)
+                    
+                    -- all the nodes above this one have just been renumbered
+                    -- we need to fix all the links to those nodes
+                    -- and remove links to the removed node
+                    for n,node in pairs(data) do
+                        for o,opt in pairs(node.options) do
+                            local dest = check_status(opt.results.text[1], "node")
+                            if dest and type(dest)=='number' then
+                                if dest >= story_node then
+                                    local req = opt.results.text[1]
+                                    local s,e = req:find("node=.+;") 
+                                    if dest == story_node then
+                                        -- we just deleted the destination of this option
+                                        req = req:sub(1,s-1).."node=?;"..req:sub(e+1) 
+                                    else
+                                        -- we just moved the destination of this option up by 1
+                                        local n = tonumber(req:sub(s+5,e-1)) - 1
+                                        req = req:sub(1,s-1).."node="..n..";"..req:sub(e+1) 
+                                    end
+                                    opt.results.text[1] = req
+                                end
+                            end
+                        end
+                    end
+                    
+                    if story_node > #data then story_node = #data end
+                end
+                
+                
+            else
+                table.remove(story, story_alt)
+                if story_alt > #story then story_alt = #story end
+            end
+        end
+
         local function story_left() 
             if story_alt > 1 then story_alt = story_alt - 1 end
         end
         local function story_right() 
             if story_alt < #story then story_alt = story_alt + 1 end
-        end
-        local function story_up() 
-            -- move up a node
-            -- need to look up which is the node above
-            -- there may be multiple options...?
-            -- maybe this button makes no sense?
-            -- maybe node navigation should be via the node map only?
-            -- perhaps I should add something in here temporarily
-            -- or maybe we should go up to the first available
-            -- or maintain a stack and go up to the one we came from
-            
-            -- simple version
-            -- search for any node with any option that leads to the current node
-            for k,v in ipairs(data) do
-                for k2,v2 in ipairs(v.options) do
-                    local node = check_status(v2.results.text[1], 'node')
-                    if node==story_node then 
-                        story_node=k 
-                        story_alt=1
-                        return 
-                    end
-                end
-            end
-       
         end
         
         -- the layout will grow down and to the right from this point
@@ -352,17 +370,13 @@ function editor:update()
         suit.layout:padding(15)
 
         if suit.Button("New Alt", suit.layout:row(150,40)).hit then new_alt_story() end
+        local button_text = "Delete Alt"
+        if #story == 1 then button_text = "Delete Node" end
+        if suit.Button(button_text, suit.layout:row(150,40)).hit then delete_story() end
         
-        suit.Label("", suit.layout:row(50, 50))     -- invisible label as spacer
-        suit.layout:padding(0)
-        if suit.Button("U", suit.layout:col(50,50)).hit then story_up() end
-        suit.layout:left(50, 50)
         if suit.Button("L", suit.layout:row(50,50)).hit then story_left() end
         suit.layout:padding(50)
         if suit.Button("R", suit.layout:col(50,50)).hit then story_right() end
-        --suit.layout:padding(0)
-        --suit.layout:left(50, 50)
-        --if suit.Button("D", suit.layout:row(50,50)).hit then story_down() end
         suit.layout:padding(15)
         
         suit.layout:left(100, 50)        -- I don't understand why these values work but whatever
@@ -675,10 +689,11 @@ function editor:update()
     end
      
     -- actually draw the map
+    button_locations = {}
     for level = 1, 10 do
     
         local buttons = {}
-           
+        
         for k,v in ipairs(node_levels) do
             if v == level then
                 table.insert(buttons, k)
