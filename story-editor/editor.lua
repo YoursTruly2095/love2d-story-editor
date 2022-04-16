@@ -229,52 +229,28 @@ function editor:update()
         local function do_option(opt) 
             
             -- apply results
---[[
-            local _results = split(opt.results.text[1], ';')
-            local _status = split(player_status.text[1], ';')
-            local results = {}
-            local status = {}
-            
-            for _,_v in ipairs(_results) do
-                local t = split(_v,'=')
-                if t[1] ~= 'node' then results[t[1] ]=t[2] end
-            end
-            
-            for _,_v in ipairs(_status) do
-                local t = split(_v,'=')
-                status[t[1] ]=t[2]
-            end
---]]            
             local results = convert_op_string(opt.results.text[1], decode_results)
             local status = convert_op_string(player_status.text[1], decode_status)
             
-            if results.node then 
-                story_node = results.node.val
+            -- switch to a new node if the option result specifies 
+            -- one, and that node actually exists
+            if results.node then
+                if data[results.node.val] then 
+                    story_node = results.node.val 
+                else
+                    print("Tried to go to non-existent node "..results.node.val)
+                end
                 results.node = nil
             end
             
-            
             status = apply_results(status, results)
             
---[[    
-           
-            for k,result in pairs(results) do
-                if status[k] == nil then 
-                    status[k] = result 
-                else
-                    status[k] = tostring(status[k]+result)
-                end
-            end
---]]
             local status_string = ""
             for k,v in pairs(status) do
                 status_string = status_string..k..v.op..v.val..";"
             end
             player_status.text[1] = status_string
---[[            
-            local new_node = check_status(opt.results.text[1], 'node')
-            if new_node then story_node = new_node end
---]]            
+        
         end
         
         -- play instead of editing
