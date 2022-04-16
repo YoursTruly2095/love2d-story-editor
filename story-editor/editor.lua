@@ -412,6 +412,9 @@ function editor:update()
         local function new_node(k)
             table.insert(data,
                 {
+                    display_level = {},
+                    display_offset = {},
+        
                     story =     
                     {
                         -- alternate story text at each node

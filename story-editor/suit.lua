@@ -526,7 +526,13 @@ do
             end
             
             -- validate the cursor
-            if input.cursor > utf8.len(input.text[input.cursorline]) then input.cursor = utf8.len(input.text[input.cursorline])+1 end
+            if input.cursorline > #input.text then
+                input.cursorline = #input.text
+            end
+            
+            if input.cursor > utf8.len(input.text[input.cursorline]) then 
+                input.cursor = utf8.len(input.text[input.cursorline])+1 
+            end
         end
             
  		-- compute drawing offset
