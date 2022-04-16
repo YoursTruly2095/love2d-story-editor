@@ -6,18 +6,23 @@
 require("editor")
 
 function love.load(arg)
-  -- stuff for debugging in zerobrane
-  require("mobdebug").start()
-  io.stdout:setvbuf("no")
+    -- stuff for debugging in zerobrane
   
-  love.window.setFullscreen(true)
-  editor:load()
+    local hasdebug,debug = pcall(require,"mobdebug")
+    if hasdebug then
+        debug.start()
+    end
+  
+    io.stdout:setvbuf("no")
+  
+    love.window.setFullscreen(true)
+    editor:load()
 end
 
 function love.update(dt)
-  editor:update(dt)
+    editor:update(dt)
 end
 
 function love.draw()
-  editor:draw()
+    editor:draw()
 end 
