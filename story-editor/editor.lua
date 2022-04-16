@@ -62,6 +62,8 @@ end
 
 function editor:update()
     -- all the UI is defined in love.update or functions that are called from it
+    local story = data[story_node].story
+    local options = data[story_node].options
 	
     local function load_file()
         if filename == '...none...' then return end
@@ -176,10 +178,67 @@ function editor:update()
         if suit.Button("Cancel", suit.layout:row(150,70)).hit then mode = 'normal' end
     end
         
+    local function delete_story_screen()
+        
+        local function actual_delete()
+            if #story == 1 then
+                -- there is only 1 alt, we are deleting the entire node, 
+                -- but don't let the last node be deleted
+                if #data > 1 then
+                    table.remove(data, story_node)
+                    
+                    -- all the nodes above this one have just been renumbered
+                    -- we need to fix all the links to those nodes
+                    -- and remove links to the removed node
+                    for n,node in pairs(data) do
+                        for o,opt in pairs(node.options) do
+                            local dest = check_status(opt.results.text[1], "node")
+                            if dest and type(dest)=='number' then
+                                if dest >= story_node then
+                                    local req = opt.results.text[1]
+                                    local s,e = req:find("node=%d+;") 
+                                    if dest == story_node then
+                                        -- we just deleted the destination of this option
+                                        req = req:sub(1,s-1).."node=?;"..req:sub(e+1) 
+                                    else
+                                        -- we just moved the destination of this option up by 1
+                                        local n = req:sub(s+5,e-1)
+                                        n = tonumber(n) - 1
+                                        req = req:sub(1,s-1).."node="..n..";"..req:sub(e+1) 
+                                    end
+                                    opt.results.text[1] = req
+                                end
+                            end
+                        end
+                    end
+                    if story_node > #data then story_node = #data end
+                end
+            else
+                table.remove(story, story_alt)
+                if story_alt > #story then story_alt = #story end
+            end
+            mode='normal'
+        end
+    
+        suit.layout:reset(25,25,25)
+        if #story == 1 then
+            suit.Label("Are you sure you want to delete this node?",suit.layout:col(900,40))
+            suit.Label("All text and options will be irretrievably lost.",suit.layout:row(900,40))
+        else
+            suit.Label("Are you sure you want to delete this story alternative?",suit.layout:col(900,40))
+            suit.Label("This text will be irretrievably lost.",suit.layout:row(900,40))
+        end
+        
+        -- delete and cancel buttons
+        suit.layout:reset(25,870,25)
+        if suit.Button("Delete", suit.layout:row(150,70)).hit then actual_delete() end
+        if suit.Button("Cancel", suit.layout:row(150,70)).hit then mode = 'normal' end
+    end
     
     if mode == 'load' then load_screen() return end
     if mode == 'saveas' then save_screen() return end
     if mode == 'quit' then quit_screen() return end
+    if mode == 'delete_story' then delete_story_screen() return end
     
     -- NORMAL MODE
     -- load and save buttons
@@ -198,8 +257,6 @@ function editor:update()
     suit.layout:reset(800,1000,15)
     if suit.Button("Quit", suit.layout:row(150,40)).hit then mode = 'quit' end
         
-    local story = data[story_node].story
-    local options = data[story_node].options
     local lw = 80                   -- label width
     
     if normal_mode == 'play' then
@@ -312,47 +369,6 @@ function editor:update()
             story_alt = #story
         end
 
-        local function delete_story()
-            if #story == 1 then
-                -- there is only 1 alt, we are deleting the entire node, 
-                -- but don't let the last node be deleted
-                if #data > 1 then
-                    table.remove(data, story_node)
-                    
-                    -- all the nodes above this one have just been renumbered
-                    -- we need to fix all the links to those nodes
-                    -- and remove links to the removed node
-                    for n,node in pairs(data) do
-                        for o,opt in pairs(node.options) do
-                            local dest = check_status(opt.results.text[1], "node")
-                            if dest and type(dest)=='number' then
-                                if dest >= story_node then
-                                    local req = opt.results.text[1]
-                                    local s,e = req:find("node=.+;") 
-                                    if dest == story_node then
-                                        -- we just deleted the destination of this option
-                                        req = req:sub(1,s-1).."node=?;"..req:sub(e+1) 
-                                    else
-                                        -- we just moved the destination of this option up by 1
-                                        local n = tonumber(req:sub(s+5,e-1)) - 1
-                                        req = req:sub(1,s-1).."node="..n..";"..req:sub(e+1) 
-                                    end
-                                    opt.results.text[1] = req
-                                end
-                            end
-                        end
-                    end
-                    
-                    if story_node > #data then story_node = #data end
-                end
-                
-                
-            else
-                table.remove(story, story_alt)
-                if story_alt > #story then story_alt = #story end
-            end
-        end
-
         local function story_left() 
             if story_alt > 1 then story_alt = story_alt - 1 end
         end
@@ -372,7 +388,7 @@ function editor:update()
         if suit.Button("New Alt", suit.layout:row(150,40)).hit then new_alt_story() end
         local button_text = "Delete Alt"
         if #story == 1 then button_text = "Delete Node" end
-        if suit.Button(button_text, suit.layout:row(150,40)).hit then delete_story() end
+        if suit.Button(button_text, suit.layout:row(150,40)).hit then mode = 'delete_story' end
         
         if suit.Button("L", suit.layout:row(50,50)).hit then story_left() end
         suit.layout:padding(50)
@@ -722,13 +738,15 @@ end
 function editor:draw()
 
     -- draw lines between buttons to be options
-    for n, node in ipairs(data) do
-        for o, option in ipairs(node.options) do
-            local destination_node = check_status(option.results.text[1], 'node')
-            if destination_node ~= nil and button_locations[n] and button_locations[destination_node] then
-                -- draw an arrow for node to destination_node
-                love.graphics.line(button_locations[n][1],button_locations[n][2]+20,
-                    button_locations[destination_node][1], button_locations[destination_node][2])
+    if mode == 'normal' then
+        for n, node in ipairs(data) do
+            for o, option in ipairs(node.options) do
+                local destination_node = check_status(option.results.text[1], 'node')
+                if destination_node ~= nil and button_locations[n] and button_locations[destination_node] then
+                    -- draw an arrow for node to destination_node
+                    love.graphics.line(button_locations[n][1],button_locations[n][2]+20,
+                        button_locations[destination_node][1], button_locations[destination_node][2])
+                end
             end
         end
     end
