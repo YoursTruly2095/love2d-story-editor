@@ -424,6 +424,7 @@ do
             local l = 0
             while l < #input.text do
                 l = l + 1
+                local saved_wrap_state = input.line_wrap[l]
                 if w < opt.font:getWidth(input.text[l]) then
                     -- just assume line is too wide, it will work fine anyway if it is not
                     local words = utils_split(input.text[l], ' ')
@@ -447,6 +448,7 @@ do
                         end
                     end
                     input.text[l] = build_line
+                    input.line_wrap[l] = saved_wrap_state 
                 else
                     -- line is not too wide... if we wrap, then we 
                     -- might be able to fit a word from the next line
@@ -457,15 +459,14 @@ do
                         local old_build_line = input.text[l]
                         local finished = false
                         while not finished and word_count < #words do
-                            word_count = word_count + 1
-                            build_line = build_line..' '..words[word_count]
                             if w < opt.font:getWidth(build_line) then
                                 -- we went over a line wrap
                                 input.text[l] = old_build_line
-                                word_count = word_count - 1
                                 finished = true
                             else
                                 old_build_line = build_line
+                                word_count = word_count + 1
+                                build_line = build_line..' '..words[word_count]
                             end
                         end
                         input.text[l+1] = words[word_count] or ""
