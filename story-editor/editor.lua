@@ -70,7 +70,7 @@ function editor:update()
         local load_string
         local length
         load_string, length = love.filesystem.read(filename)
-        if length > 0 then
+        if load_string and length > 0 then
             local load_data = smallfolk.loads(load_string)
             -- validate??
             data = deep_copy(load_data)
@@ -131,7 +131,7 @@ function editor:update()
         -- or for now...
         suit.layout:reset(25,25,25)
         suit.Label("filename",suit.layout:col(100,40))
-        suit.Input(editable_filename, suit.layout:col(600,40))
+        suit.Input(editable_filename, {id="f"}, suit.layout:col(600,40))
         
         -- load and cancel buttons
         suit.layout:reset(25,870,25)
@@ -154,7 +154,7 @@ function editor:update()
         
         suit.layout:reset(25,25,25)
         suit.Label("filename",suit.layout:col(100,40))
-        suit.Input(editable_filename, suit.layout:col(600,40))
+        suit.Input(editable_filename, {id="f"}, suit.layout:col(600,40))
         
         
         -- save and cancel buttons
@@ -325,7 +325,7 @@ function editor:update()
         suit.Label("Status", suit.layout:row(150, 25))
         suit.layout:up(0,25)
         suit.layout:right(175,0)    
-        suit.Input(player_status, suit.layout:col(700,265))
+        suit.Input(player_status, {id='ps', wrap=true}, suit.layout:col(700,265))
         
         suit.layout:reset(25,320,25)
         suit.Label("Story", suit.layout:row(150, 25))
@@ -335,7 +335,7 @@ function editor:update()
         suit.layout:right(175,0)    
         -- pick the story alt depending on the player status
         pick_alt()
-        suit.Input(story[story_alt].text, suit.layout:col(700,265))
+        suit.Input(story[story_alt].text, {id=story[story_alt].id, wrap=true}, suit.layout:col(700,265))
 
         suit.layout:reset(25,615,25)
         suit.Label("Options", suit.layout:row(150, 25))
@@ -398,18 +398,18 @@ function editor:update()
         suit.layout:left(100, 50)        -- I don't understand why these values work but whatever
         suit.Label("lvl",suit.layout:row(35,35))
         suit.layout:padding(0)
-        suit.Input(data[story_node].display_level, suit.layout:col(35,35))
+        suit.Input(data[story_node].display_level, {id=story[story_alt].id.."dl"}, suit.layout:col(35,35))
         suit.layout:padding(10)
         suit.Label("off",suit.layout:col(35,35))
         suit.layout:padding(0)
-        suit.Input(data[story_node].display_offset, suit.layout:col(50,35))
+        suit.Input(data[story_node].display_offset, {id=story[story_alt].id.."do"}, suit.layout:col(50,35))
         
         suit.layout:up(0, 245)
         suit.layout:right(75, 0)        -- I don't understand why these values work but whatever
         
-        suit.Input(story[story_alt].text, suit.layout:col(700,265))
+        suit.Input(story[story_alt].text, {id=story[story_alt].id, wrap=true}, suit.layout:col(700,265))
         suit.Label("reqs",suit.layout:row(lw,35))
-        suit.Input(story[story_alt].reqs, suit.layout:col(700-lw,35))
+        suit.Input(story[story_alt].reqs, {id=story[story_alt].id.."reqs"}, suit.layout:col(700-lw,35))
         
         
         -- OPTIONS
@@ -523,13 +523,13 @@ function editor:update()
         local function entry(k)
             suit.Label("opt"..k,suit.layout:col(lw,35))
             suit.layout:padding(0)
-            suit.Input(options[k].text, suit.layout:col(tw,35))
+            suit.Input(options[k].text, {id=options[k].id}, suit.layout:col(tw,35))
             suit.layout:left(lw)
             suit.Label("reqs",suit.layout:row(lw,35))
-            suit.Input(options[k].reqs, suit.layout:col(tw,35))
+            suit.Input(options[k].reqs, {id=options[k].id.."reqs"}, suit.layout:col(tw,35))
             suit.layout:left(lw)
             suit.Label("result",suit.layout:row(lw,35))
-            suit.Input(options[k].results, suit.layout:col(tw,35))
+            suit.Input(options[k].results, {id=options[k].id.."results"}, suit.layout:col(tw,35))
             suit.layout:up(tw,70)
             suit.layout:padding(25)
             
