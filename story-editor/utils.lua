@@ -6,6 +6,9 @@ function split(str, sep)
     return t
 end
 
+function utils_split(str, sep)
+    return split(str,sep)
+end
 
 function check_status(status_string, status)
     local statuses = split(status_string, ';')

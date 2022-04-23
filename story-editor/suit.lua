@@ -29,6 +29,8 @@ THE SOFTWARE.
 
 -- Theme -----------------------------------------------------------------------
 
+require('utils')
+
 local theme = {}
 theme.cornerRadius = 4
 
@@ -380,6 +382,112 @@ do
 		opt.font = opt.font or love.graphics.getFont()
 
 		input.text = input.text or {""}
+        input.line_wrap = input.line_wrap or {}
+        
+        local function insert_text_line(l, text, wrap)
+            wrap = wrap or false
+            
+            -- handle word wrap
+            -- if we are adding a line, then copy the wrap state
+            -- from the line above, and then apply the wrap
+            -- state passed in to that line
+            local temp_wrap = false
+            if l>1 then 
+                temp_wrap = input.line_wrap[l-1]
+                input.line_wrap[l-1] = wrap
+            end
+            
+            table.insert(input.text, l, text)
+            table.insert(input.line_wrap, l, temp_wrap)
+        end
+        
+        local function remove_text_line(l)
+            table.remove(input.text, l)
+            
+            -- handle word wrap
+            -- if we are removing a line, and the line above wraps, then that
+            -- line above should get the wrap state of this line
+            if l>1 and input.line_wrap[l-1] then
+                input.line_wrap[l-1] = input.line_wrap[l]
+            end
+            
+            table.remove(input.line_wrap, l)
+        end
+        
+        -- validate the line wrap table
+        for k,_ in ipairs(input.text) do
+            if input.line_wrap[k] == nil then input.line_wrap[k] = false end
+        end
+        
+        -- handle word wrap immediately after setting up input.text
+        if opt.wrap then
+            local l = 0
+            while l < #input.text do
+                l = l + 1
+                if w < opt.font:getWidth(input.text[l]) then
+                    -- just assume line is too wide, it will work fine anyway if it is not
+                    local words = utils_split(input.text[l], ' ')
+                    local word_count = 1
+                    local build_line = words[1] or ""
+                    local old_build_line = ""
+                    while word_count < #words do
+                        word_count = word_count + 1
+                        build_line = build_line..' '..words[word_count]
+                        if w < opt.font:getWidth(build_line) then
+                            -- we went over a line wrap
+                            input.text[l] = old_build_line
+                            --insert_text_line(l+1, "", input.line_wrap[l]) -- copy this line's wrap to the new line we are adding
+                            input.line_wrap[l] = true
+                            l = l + 1 
+                            insert_text_line(l, "", input.line_wrap[l-1]) 
+                            build_line = words[word_count]
+                            old_build_line=""
+                        else
+                            old_build_line = build_line
+                        end
+                    end
+                    input.text[l] = build_line
+                else
+                    -- line is not too wide... if we wrap, then we 
+                    -- might be able to fit a word from the next line
+                    if input.line_wrap[l] then
+                        local words = utils_split(input.text[l+1], ' ')
+                        local word_count = 1
+                        local build_line = input.text[l]..' '..words[1] or ""
+                        local old_build_line = input.text[l]
+                        local finished = false
+                        while not finished and word_count < #words do
+                            word_count = word_count + 1
+                            build_line = build_line..' '..words[word_count]
+                            if w < opt.font:getWidth(build_line) then
+                                -- we went over a line wrap
+                                input.text[l] = old_build_line
+                                word_count = word_count - 1
+                                finished = true
+                            else
+                                old_build_line = build_line
+                            end
+                        end
+                        input.text[l+1] = words[word_count] or ""
+                        while word_count < #words do
+                            word_count = word_count + 1
+                            input.text[l+1] = input.text[l+1]..' '..words[word_count]
+                        end
+                        if input.text[l+1] == "" or input.text[l+1] == ' ' then
+                            remove_text_line(l+1)
+                        end
+                    end
+                end
+            end        
+            
+            -- okay, leave at least one blank string
+            if #input.text == 0 then
+                input.text[1] = ""
+            end
+        end
+        
+        
+        
         input.select = input.select or false
         
         -- need to find widest line
@@ -438,6 +546,11 @@ do
             local finish = input.selection_end
             local line = input.text[start.line]:sub(1, start.pos-1)
         
+            -- copy / paste needs to become word wrap aware
+            -- need a 'line_wrap' for the selection, and
+            -- update input.line_wrap with it on paste
+        
+        
             local lines = finish.line - start.line + 1
         
             if lines == 1 then
@@ -466,7 +579,10 @@ do
                 if k > 1 then
                     clipboard_string = clipboard_string.."\n"..v
                 end
-            end    
+            end  
+            
+            -- should really undo the word wrapping before putting in the system buffer
+            
             love.system.setClipboardText(clipboard_string)
             
         end
@@ -489,15 +605,15 @@ do
                 input.cursor = utf8.len(s..input.selection[1])+1
             elseif #input.selection == 2 then
                 input.text[line] = s..input.selection[1]
-                table.insert(input.text, line+1, input.selection[2]..e)
+                insert_text_line(line+1, input.selection[2]..e)
                 input.cursorline = input.cursorline + 1
                 input.cursor = utf8.len(input.selection[2])+1
             else
                 input.text[line] = s..input.selection[1]
                 for i=2, #input.selection-1 do
-                    table.insert(input.text, line+i-1, input.selection[i])
+                    insert_text_line(line+i-1, input.selection[i])
                 end
-                table.insert(input.text, line+#input.selection-1, input.selection[#input.selection]..e)
+                insert_text_line(line+#input.selection-1, input.selection[#input.selection]..e)
                 input.cursorline = line+#input.selection-1
                 input.cursor = utf8.len(input.selection[#input.selection])+1
             end
@@ -521,7 +637,7 @@ do
                 input.text[start.line] = line .. input.text[finish.line]:sub(finish.pos)
             
                 for _ = start.line + 1, finish.line do
-                    table.remove(input.text, start.line+1)
+                    remove_text_line(start.line+1)
                 end
             end
             
@@ -610,7 +726,7 @@ do
                             if input.cursorline > 1 then
                                 local a = input.text[input.cursorline-1]
                                 local b = input.text[input.cursorline]
-                                table.remove(input.text, input.cursorline)
+                                remove_text_line(input.cursorline)
                                 input.cursorline = input.cursorline - 1
                                 input.cursor = utf8.len(input.text[input.cursorline])+1
                                 input.text[input.cursorline] = table.concat{a,b}
@@ -633,7 +749,7 @@ do
                                 local a = input.text[input.cursorline]
                                 local b = input.text[input.cursorline+1]
                                 input.text[input.cursorline] = table.concat{a,b}
-                                table.remove(input.text, input.cursorline+1)
+                                remove_text_line(input.cursorline+1)
                             end
                         else
                             local a,b = split(input.text[input.cursorline], input.cursor)
@@ -651,7 +767,7 @@ do
                     input.text[input.cursorline] = a
                     input.cursor = 1
                     input.cursorline = input.cursorline + 1
-                    table.insert(input.text, input.cursorline, b)
+                    insert_text_line(input.cursorline, b)
                 
                     -- implement copy, paste, cut, undo with our selection buffer
                 
@@ -710,7 +826,30 @@ do
         
 --		input.candidate_text = {text=core.candidate_text.text, start=core.candidate_text.start, length=core.candidate_text.length}
 		core:registerDraw(opt.draw or core.theme.Input, input, opt, x,y,w,h)
-
+ --[[       
+        -- handle word wrap
+        if opt.wrap then
+            -- concatenate all the strings with false endings, and replace with blank strings
+            for _, l in ipairs(line_wrap) do
+                input.text[l+1] = input.text[l]..' '..input.text[l+1]
+                input.text[l] = ""
+            end
+            
+            -- remove the blank strings
+            local l = 0
+            while l < #input.text do
+                l = l + 1
+                while input.text[l] == "" do
+                    remove_text_line(l)
+                end
+            end
+            
+            -- okay, leave at least one blank string
+            if #input.text == 0 then
+                input.text[1] = ""
+            end
+        end
+--]]        
 		return {
 			id = opt.id,
 			hit = core:mouseReleasedOn(opt.id),
