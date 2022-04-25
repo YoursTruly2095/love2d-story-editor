@@ -449,6 +449,7 @@ do
                     end
                     input.text[l] = build_line
                     input.line_wrap[l] = saved_wrap_state 
+                    l = l - 1       -- process this line again in case we can now add some words from the line below
                 else
                     -- line is not too wide... if we wrap, then we 
                     -- might be able to fit a word from the next line
@@ -467,6 +468,17 @@ do
                                 old_build_line = build_line
                                 word_count = word_count + 1
                                 build_line = build_line..' '..words[word_count]
+                            end
+                        end
+                        if not finished then
+                            -- we ran out of words
+                            if w < opt.font:getWidth(build_line) then
+                                -- but the last word does not fit
+                                input.text[l] = old_build_line
+                            else
+                                -- and the last word fits..!
+                                input.text[l] = build_line
+                                word_count = word_count + 1
                             end
                         end
                         input.text[l+1] = words[word_count] or ""
