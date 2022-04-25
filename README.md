@@ -2,8 +2,10 @@
 An editor for creating branching stories in love2d
 
 Create stories with a branching tree structure, with options the player can select to
-move to different nodes in the story. Each node can have multiple texts, which are 
-selected based on the player's status. Which options are available is also controllable
+move to different nodes in the story. 
+
+Each node can have multiple alternate texts, one of which is 
+selected for display in-game based on the player's status. Which options are available is also controllable
 by player status, and selecting an option can cause player status to be updated.
 
 Player status variables are keys (arbitrary strings) associated with integer values. 
