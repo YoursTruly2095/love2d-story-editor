@@ -414,10 +414,34 @@ do
             table.remove(input.line_wrap, l)
         end
         
+        
+        input.select = input.select or false
+        
+        -- need to find widest line
+        local text_width = 0
+        for i,text in ipairs(input.text) do
+            local width = opt.font:getWidth(text)
+            if text_width < width then text_width = width end
+        end
+            
+		w = w or text_width + 6
+		h = h or opt.font:getHeight() * #input.text + 4
+
+        input.cursorline = input.cursorline or 1
+		input.cursor = math.max(1, math.min(utf8.len(input.text[input.cursorline])+1, input.cursor or utf8.len(input.text[input.cursorline])+1))
+		-- cursor is position *before* the character (including EOS) i.e. in "hello":
+		--   position 1: |hello
+		--   position 2: h|ello
+		--   ...
+		--   position 6: hello|
+
+
         -- validate the line wrap table
         for k,_ in ipairs(input.text) do
             if input.line_wrap[k] == nil then input.line_wrap[k] = false end
         end
+        
+        local wrap_width = w-10
         
         -- handle word wrap immediately after setting up input.text
         if opt.wrap then
@@ -425,7 +449,7 @@ do
             while l < #input.text do
                 l = l + 1
                 local saved_wrap_state = input.line_wrap[l]
-                if w < opt.font:getWidth(input.text[l]) then
+                if wrap_width < opt.font:getWidth(input.text[l]) then
                     -- just assume line is too wide, it will work fine anyway if it is not
                     local words = utils_split(input.text[l], ' ')
                     local word_count = 1
@@ -434,11 +458,19 @@ do
                     while word_count < #words do
                         word_count = word_count + 1
                         build_line = build_line..' '..words[word_count]
-                        if w < opt.font:getWidth(build_line) then
+                        if wrap_width < opt.font:getWidth(build_line) then
                             -- we went over a line wrap
                             input.text[l] = old_build_line
-                            --insert_text_line(l+1, "", input.line_wrap[l]) -- copy this line's wrap to the new line we are adding
                             input.line_wrap[l] = true
+                            -- if the cursor was in the word that is wrapping, it needs to be moved
+                            if input.cursorline == l then
+                                local width_in_chars = utf8.len(old_build_line)
+                                if width_in_chars < input.cursor then
+                                    input.cursorline = input.cursorline + 1
+                                    input.cursor = input.cursor - (width_in_chars + 1) -- one more to account for the space that gets lost
+                                end
+                            end
+                            -- add a new line for the wrapped words
                             l = l + 1 
                             insert_text_line(l, "", input.line_wrap[l-1]) 
                             build_line = words[word_count]
@@ -460,7 +492,7 @@ do
                         local old_build_line = input.text[l]
                         local finished = false
                         while not finished and word_count < #words do
-                            if w < opt.font:getWidth(build_line) then
+                            if wrap_width < opt.font:getWidth(build_line) then
                                 -- we went over a line wrap
                                 input.text[l] = old_build_line
                                 finished = true
@@ -472,7 +504,7 @@ do
                         end
                         if not finished then
                             -- we ran out of words
-                            if w < opt.font:getWidth(build_line) then
+                            if wrap_width < opt.font:getWidth(build_line) then
                                 -- but the last word does not fit
                                 input.text[l] = old_build_line
                             else
@@ -499,27 +531,9 @@ do
             end
         end
         
-        
-        
-        input.select = input.select or false
-        
-        -- need to find widest line
-        local text_width = 0
-        for i,text in ipairs(input.text) do
-            local width = opt.font:getWidth(text)
-            if text_width < width then text_width = width end
-        end
-            
-		w = w or text_width + 6
-		h = h or opt.font:getHeight() * #input.text + 4
 
-        input.cursorline = input.cursorline or 1
-		input.cursor = math.max(1, math.min(utf8.len(input.text[input.cursorline])+1, input.cursor or utf8.len(input.text[input.cursorline])+1))
-		-- cursor is position *before* the character (including EOS) i.e. in "hello":
-		--   position 1: |hello
-		--   position 2: h|ello
-		--   ...
-		--   position 6: hello|
+
+
 
 		-- get size of text and cursor position
 		opt.cursor_pos = 0
