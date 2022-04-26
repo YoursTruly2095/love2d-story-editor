@@ -150,3 +150,33 @@ function deep_copy_with_ignore(item, ignore)
     
     return copy
 end
+
+function dewrap(input)
+    
+    local line_wrap = input.line_wrap or {}
+    local text = input.text or {}
+    
+    -- concatenate all the strings with false endings, and replace with blank strings
+    for l, wrap in ipairs(line_wrap) do
+        if wrap then
+            text[l+1] = text[l]..' '..text[l+1]
+            text[l] = "<<<dewrap>>>"
+        end
+    end
+    
+    -- remove the blank strings
+    local l = 0
+    while l < #text do
+        l = l + 1
+        while text[l] == "<<<dewrap>>>" do
+            table.remove(text, l)
+        end
+    end
+    
+    -- okay, leave at least one blank string
+    if #text == 0 then
+        text[1] = ""
+    end
+    
+    return text
+end

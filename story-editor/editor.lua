@@ -99,9 +99,13 @@ function editor:update()
         
     local function save_file() 
         if filename == '...none...' then mode = 'saveas' return end
-        local save_data = deep_copy_with_ignore(data, {'cursor','cursorline','select','text_draw_offset'})
---        local save_string = json.encode(save_data)
---        local new_save_data = json.decode(save_string)
+        local save_data = deep_copy(data)
+        for n,node in ipairs(save_data) do
+            for s,story_alt in ipairs(node.story) do
+                dewrap(story_alt.text)
+            end
+        end
+        save_data = deep_copy_with_ignore(save_data, {'line_wrap','cursor','cursorline','select','text_draw_offset'})
         local save_string = smallfolk.dumps(save_data)
         local new_save_data = smallfolk.loads(save_string)
         

@@ -530,9 +530,6 @@ do
                 input.text[1] = ""
             end
         end
-        
-
-
 
 
 		-- get size of text and cursor position
@@ -609,6 +606,7 @@ do
             end  
             
             -- should really undo the word wrapping before putting in the system buffer
+            -- but we don't really know which lines to dewrap at this point...
             
             love.system.setClipboardText(clipboard_string)
             
@@ -853,30 +851,7 @@ do
         
 --		input.candidate_text = {text=core.candidate_text.text, start=core.candidate_text.start, length=core.candidate_text.length}
 		core:registerDraw(opt.draw or core.theme.Input, input, opt, x,y,w,h)
- --[[       
-        -- handle word wrap
-        if opt.wrap then
-            -- concatenate all the strings with false endings, and replace with blank strings
-            for _, l in ipairs(line_wrap) do
-                input.text[l+1] = input.text[l]..' '..input.text[l+1]
-                input.text[l] = ""
-            end
-            
-            -- remove the blank strings
-            local l = 0
-            while l < #input.text do
-                l = l + 1
-                while input.text[l] == "" do
-                    remove_text_line(l)
-                end
-            end
-            
-            -- okay, leave at least one blank string
-            if #input.text == 0 then
-                input.text[1] = ""
-            end
-        end
---]]        
+ 
 		return {
 			id = opt.id,
 			hit = core:mouseReleasedOn(opt.id),
