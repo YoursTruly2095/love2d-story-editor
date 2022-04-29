@@ -454,7 +454,7 @@ do
                     local words = utils_split(input.text[l], ' ')
                     local word_count = 1
                     local build_line = words[1] or ""
-                    local old_build_line = ""
+                    local old_build_line = words[1]
                     while word_count < #words do
                         word_count = word_count + 1
                         build_line = build_line..' '..words[word_count]
@@ -481,7 +481,9 @@ do
                     end
                     input.text[l] = build_line
                     input.line_wrap[l] = saved_wrap_state 
-                    l = l - 1       -- process this line again in case we can now add some words from the line below
+                    if #words > 1 then  -- exclude the edge case where we have a single word that is greater than the width of the text box, no point processing that again
+                        l = l - 1       -- process this line again in case we can now add some words from the line below
+                    end
                 else
                     -- line is not too wide... if we wrap, then we 
                     -- might be able to fit a word from the next line
@@ -535,7 +537,14 @@ do
 		-- get size of text and cursor position
 		opt.cursor_pos = 0
 		if input.cursor > 1 then
-			local s = input.text[input.cursorline]:sub(1, utf8.offset(input.text[input.cursorline], input.cursor)-1)
+			local offset = utf8.offset(input.text[input.cursorline], input.cursor)
+            local s
+            if offset == nil then
+                print("Error - cursor offset local is nil")
+                s = input.text[input.cursorline]
+            else
+                s = input.text[input.cursorline]:sub(1, offset-1)
+            end
 			opt.cursor_pos = opt.font:getWidth(s)
 		end
 
@@ -601,14 +610,13 @@ do
             local clipboard_string = input.selection[1]
             for k,v in ipairs(input.selection) do
                 if k > 1 then
+                    -- should add a newline or a space, depending on whether 
+                    -- the line we are adding to is word wrapped
                     clipboard_string = clipboard_string.."\n"..v
                 end
             end  
             
-            -- should really undo the word wrapping before putting in the system buffer
-            -- but we don't really know which lines to dewrap at this point...
-            
-            love.system.setClipboardText(clipboard_string)
+             love.system.setClipboardText(clipboard_string)
             
         end
         
