@@ -395,20 +395,39 @@ do
             if l>1 then 
                 temp_wrap = input.line_wrap[l-1]
                 input.line_wrap[l-1] = wrap
+ 
+                -- if the cursor was in the word that is wrapping, it needs to be moved
+                local cl = l-1
+                if input.cursorline == cl then
+                    local width_in_chars = utf8.len(input.text[cl])
+                    if width_in_chars < input.cursor then
+                        input.cursorline = input.cursorline + 1
+                        input.cursor = input.cursor - (width_in_chars + 1) -- one more to account for the space that gets lost
+                    end
+                end
             end
             
             table.insert(input.text, l, text)
             table.insert(input.line_wrap, l, temp_wrap)
+            
         end
         
         local function remove_text_line(l)
             table.remove(input.text, l)
             
             -- handle word wrap
-            -- if we are removing a line, and the line above wraps, then that
-            -- line above should get the wrap state of this line
-            if l>1 and input.line_wrap[l-1] then
-                input.line_wrap[l-1] = input.line_wrap[l]
+            if l>1 then
+                -- if we are removing a line, and the line above wraps, then that
+                -- line above should get the wrap state of this line
+                if input.line_wrap[l-1] then
+                    input.line_wrap[l-1] = input.line_wrap[l]
+                end
+                
+                -- if the cursor is in the line being removed, it will need to be moved
+                if input.cursorline == l then
+                    input.cursorline = input.cursorline - 1
+                    input.cursor = utf8.len(input.text[input.cursorline]) + 1
+                end
             end
             
             table.remove(input.line_wrap, l)
@@ -462,14 +481,6 @@ do
                             -- we went over a line wrap
                             input.text[l] = old_build_line
                             input.line_wrap[l] = true
-                            -- if the cursor was in the word that is wrapping, it needs to be moved
-                            if input.cursorline == l then
-                                local width_in_chars = utf8.len(old_build_line)
-                                if width_in_chars < input.cursor then
-                                    input.cursorline = input.cursorline + 1
-                                    input.cursor = input.cursor - (width_in_chars + 1) -- one more to account for the space that gets lost
-                                end
-                            end
                             -- add a new line for the wrapped words
                             l = l + 1 
                             insert_text_line(l, "", input.line_wrap[l-1]) 
@@ -488,9 +499,10 @@ do
                     -- line is not too wide... if we wrap, then we 
                     -- might be able to fit a word from the next line
                     if input.line_wrap[l] then
+                        local trailing_space = (input.text[l+1]:sub(-1) == " ")
                         local words = utils_split(input.text[l+1], ' ')
                         local word_count = 1
-                        local build_line = input.text[l]..' '..words[1] or ""
+                        local build_line = input.text[l]..' '..(words[1] or "")
                         local old_build_line = input.text[l]
                         local finished = false
                         while not finished and word_count < #words do
@@ -499,6 +511,15 @@ do
                                 input.text[l] = old_build_line
                                 finished = true
                             else
+                                -- adjust the cursor if it was on the line that was shortened
+                                local cl = input.cursorline
+                                if cl == l+1 then
+                                    input.cursor = input.cursor - (utf8.len(words[word_count]) + 1)       -- +1 for space
+                                    if input.cursor <= 0 then
+                                        input.cursorline = input.cursorline - 1
+                                        input.cursor = utf8.len(build_line) + input.cursor + 1
+                                    end
+                                end
                                 old_build_line = build_line
                                 word_count = word_count + 1
                                 build_line = build_line..' '..words[word_count]
@@ -522,6 +543,8 @@ do
                         end
                         if input.text[l+1] == "" or input.text[l+1] == ' ' then
                             remove_text_line(l+1)
+                        elseif trailing_space then
+                            input.text[l+1] = input.text[l+1]..' '
                         end
                     end
                 end
@@ -537,10 +560,11 @@ do
 		-- get size of text and cursor position
 		opt.cursor_pos = 0
 		if input.cursor > 1 then
+            -- print(input.cursorline, input.cursor, input.text[input.cursorline]) --debug
 			local offset = utf8.offset(input.text[input.cursorline], input.cursor)
             local s
             if offset == nil then
-                print("Error - cursor offset local is nil")
+                print("Error - cursor offset local is nil. cursor="..input.cursor.." text="..input.text[input.cursorline])
                 s = input.text[input.cursorline]
             else
                 s = input.text[input.cursorline]:sub(1, offset-1)
