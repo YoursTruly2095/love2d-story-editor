@@ -81,7 +81,7 @@ function check_reqs(reqs, player_status)
         if player_status[k] then status = player_status[k].val end
         if status==nil then status=0 end     -- allow 0 to match nil and visa versa
         
-        if req.op == '=' or req.op == '==' and req.val ~= status then meets_reqs = false end
+        if (req.op == '=' or req.op == '==') and req.val ~= status then meets_reqs = false end
         if req.op == '>' and status <= req.val then meets_reqs = false end
         if req.op == '<' and status >= req.val then meets_reqs = false end
     

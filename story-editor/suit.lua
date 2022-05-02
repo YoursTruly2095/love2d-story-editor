@@ -784,8 +784,6 @@ do
                                 local a = input.text[input.cursorline-1]
                                 local b = input.text[input.cursorline]
                                 remove_text_line(input.cursorline)
-                                input.cursorline = input.cursorline - 1
-                                input.cursor = utf8.len(input.text[input.cursorline])+1
                                 input.text[input.cursorline] = table.concat{a,b}
                             end
                         else
