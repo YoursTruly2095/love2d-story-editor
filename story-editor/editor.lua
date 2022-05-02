@@ -71,7 +71,7 @@ function editor:update()
         local length
         load_string, length = love.filesystem.read(filename)
         if load_string and length > 0 then
-            local load_data = smallfolk.loads(load_string)
+            local load_data = smallfolk.loads(load_string, 1000000)
             -- validate??
             data = deep_copy(load_data)
             story_node = 1
@@ -107,7 +107,7 @@ function editor:update()
         end
         save_data = deep_copy_with_ignore(save_data, {'line_wrap','cursor','cursorline','select','text_draw_offset'})
         local save_string = smallfolk.dumps(save_data)
-        local new_save_data = smallfolk.loads(save_string)
+        local new_save_data = smallfolk.loads(save_string, 1000000)
         
         local success
         local message
@@ -461,6 +461,7 @@ function editor:update()
             else
                 story_node = node
             end
+            scroll_offset = 0
         end
             
         local function delete(which)
@@ -580,6 +581,7 @@ function editor:update()
     local function navigate(node)
         story_node = node
         story_alt = 1
+        scroll_offset = 0        
     end
         
 	

@@ -203,7 +203,14 @@ function theme.Input(input, opt, x,y,w,h)
 
 	-- cursor
 	if opt.hasKeyboardFocus and (love.timer.getTime() % 1) > .5 then
-        local s = input.text[input.cursorline]:sub(1, utf8.offset(input.text[input.cursorline], input.cursor)-1)
+        local offset = utf8.offset(input.text[input.cursorline], input.cursor)
+        local s
+        if offset == nil then
+            print("Error drawing cursor. cl:"..input.cursorline.." c:"..input.cursor.." t:"..input.text[input.cursorline])
+            s = input.text[input.cursorline]
+        else
+            s = input.text[input.cursorline]:sub(1, offset-1)
+        end
         local cx = x+opt.font:getWidth(s)
         local cy = (y+(h-th)/2)+((input.cursorline-1)*lh)
         
