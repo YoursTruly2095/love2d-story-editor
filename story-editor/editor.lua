@@ -65,6 +65,11 @@ function editor:update()
     local story = data[story_node].story
     local options = data[story_node].options
 	
+    local function new_id()
+        id_register = id_register + 1
+        return id_register
+    end
+
     local function load_file()
         if filename == '...none...' then return end
         local load_string
@@ -85,7 +90,7 @@ function editor:update()
             if not node.display_level then node.display_level = {} end
             if not node.display_offset then node.display_offset = {} end
             
-            -- id_register update
+            -- id_register update 
             for s,story in pairs(node.story) do
                 if story.id >= id_register then id_register = story.id + 1 end
             end
@@ -94,6 +99,26 @@ function editor:update()
                 if opt.id >= id_register then id_register = opt.id + 1 end
             end
             
+            -- id duplicate check
+            local used_ids = {}
+            for s,story in pairs(node.story) do
+                if used_ids[story.id] then
+                    local id = new_id()
+                    print("Story ID "..story.id.." is duplicated... changing to "..id)
+                    story.id = id
+                end
+                used_ids[story.id] = true
+            end
+            
+            for o,opt in pairs(node.options) do
+                if used_ids[opt.id] then
+                    local id = new_id()
+                    print("Option ID "..opt.id.." is duplicated... changing to "..id)
+                    opt.id = id
+                end
+                used_ids[opt.id] = true
+            end
+
         end
     end
         
@@ -355,12 +380,6 @@ function editor:update()
         -- play mode button
         suit.layout:reset(600,1000,15)
         if suit.Button("Play", suit.layout:row(150,40)).hit then normal_mode = 'play' end
-        
-        local function new_id()
-            id_register = id_register + 1
-            return id_register
-        end
-        
         
         -- STORY
         local function new_alt_story() 
