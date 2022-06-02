@@ -290,6 +290,17 @@ function editor:update()
     
     if normal_mode == 'play' then
         
+        local function make_player_status_string(text_control)
+            local status_string = ""
+            for key,string in pairs(text_control.text) do
+                status_string=status_string..string
+                if status_string:sub(-1) ~= ';' then
+                    status_string=status_string..';'
+                end
+            end
+            return status_string
+        end
+        
         local function pick_alt()
             story_alt = 1           -- default
             
@@ -297,7 +308,8 @@ function editor:update()
             if #story > 1 then
                 for n=2,#story do
                     local reqs = convert_op_string(story[n].reqs.text[1], decode_req)
-                    local status = convert_op_string(player_status.text[1], decode_status)
+                    local lps = make_player_status_string(player_status)
+                    local status = convert_op_string(lps, decode_status)
                     
                     if check_reqs(reqs,status)  then
                         story_alt = n
@@ -308,7 +320,8 @@ function editor:update()
         
         local function check_option(opt)
             local reqs = convert_op_string(opt.reqs.text[1], decode_req)
-            local status = convert_op_string(player_status.text[1], decode_status)
+            local lps = make_player_status_string(player_status)
+            local status = convert_op_string(lps, decode_status)
             return check_reqs(reqs,status) 
         end
         
@@ -316,7 +329,8 @@ function editor:update()
             
             -- apply results
             local results = convert_op_string(opt.results.text[1], decode_results)
-            local status = convert_op_string(player_status.text[1], decode_status)
+            local lps = make_player_status_string(player_status)
+            local status = convert_op_string(lps, decode_status)
             
             -- switch to a new node if the option result specifies 
             -- one, and that node actually exists
@@ -354,7 +368,7 @@ function editor:update()
         suit.Label("Status", suit.layout:row(150, 25))
         suit.layout:up(0,25)
         suit.layout:right(175,0)    
-        suit.Input(player_status, {id='ps', wrap=true}, suit.layout:col(700,265))
+        suit.Input(player_status, {id='ps', wrap=true, split_char=';'}, suit.layout:col(700,265))
         
         suit.layout:reset(25,320,25)
         suit.Label("Story", suit.layout:row(150, 25))

@@ -471,19 +471,20 @@ do
         
         -- handle word wrap immediately after setting up input.text
         if opt.wrap then
+            local split_char = opt.split_char or ' '
             local l = 0
             while l < #input.text do
                 l = l + 1
                 local saved_wrap_state = input.line_wrap[l]
                 if wrap_width < opt.font:getWidth(input.text[l]) then
                     -- just assume line is too wide, it will work fine anyway if it is not
-                    local words = utils_split(input.text[l], ' ')
+                    local words = utils_split(input.text[l], split_char)
                     local word_count = 1
                     local build_line = words[1] or ""
                     local old_build_line = words[1]
                     while word_count < #words do
                         word_count = word_count + 1
-                        build_line = build_line..' '..words[word_count]
+                        build_line = build_line..split_char..words[word_count]
                         if wrap_width < opt.font:getWidth(build_line) then
                             -- we went over a line wrap
                             input.text[l] = old_build_line
@@ -506,10 +507,10 @@ do
                     -- line is not too wide... if we wrap, then we 
                     -- might be able to fit a word from the next line
                     if input.line_wrap[l] then
-                        local trailing_space = (input.text[l+1]:sub(-1) == " ")
-                        local words = utils_split(input.text[l+1], ' ')
+                        local trailing_space = (input.text[l+1]:sub(-1) == split_char)
+                        local words = utils_split(input.text[l+1], split_char)
                         local word_count = 1
-                        local build_line = input.text[l]..' '..(words[1] or "")
+                        local build_line = input.text[l]..split_char..(words[1] or "")
                         local old_build_line = input.text[l]
                         local finished = false
                         while not finished and word_count < #words do
@@ -529,7 +530,7 @@ do
                                 end
                                 old_build_line = build_line
                                 word_count = word_count + 1
-                                build_line = build_line..' '..words[word_count]
+                                build_line = build_line..split_char..words[word_count]
                             end
                         end
                         if not finished then
@@ -546,12 +547,12 @@ do
                         input.text[l+1] = words[word_count] or ""
                         while word_count < #words do
                             word_count = word_count + 1
-                            input.text[l+1] = input.text[l+1]..' '..words[word_count]
+                            input.text[l+1] = input.text[l+1]..split_char..words[word_count]
                         end
-                        if input.text[l+1] == "" or input.text[l+1] == ' ' then
+                        if input.text[l+1] == "" or input.text[l+1] == split_char then
                             remove_text_line(l+1)
                         elseif trailing_space then
-                            input.text[l+1] = input.text[l+1]..' '
+                            input.text[l+1] = input.text[l+1]..split_char
                         end
                     end
                 end
