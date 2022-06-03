@@ -387,6 +387,7 @@ do
 		local opt, x,y,w,h = core.getOptionsAndSize(...)
 		opt.id = opt.id or input
 		opt.font = opt.font or love.graphics.getFont()
+        opt.undo = opt.undo or false
 
 		input.text = input.text or {""}
         input.line_wrap = input.line_wrap or {}
@@ -470,100 +471,103 @@ do
         local wrap_width = w-10
         
         -- handle word wrap immediately after setting up input.text
-        if opt.wrap then
-            local split_char = opt.split_char or ' '
-            local l = 0
-            while l < #input.text do
-                l = l + 1
-                local saved_wrap_state = input.line_wrap[l]
-                if wrap_width < opt.font:getWidth(input.text[l]) then
-                    -- just assume line is too wide, it will work fine anyway if it is not
-                    local words = utils_split(input.text[l], split_char)
-                    local word_count = 1
-                    local build_line = words[1] or ""
-                    local old_build_line = words[1]
-                    while word_count < #words do
-                        word_count = word_count + 1
-                        build_line = build_line..split_char..words[word_count]
-                        if wrap_width < opt.font:getWidth(build_line) then
-                            -- we went over a line wrap
-                            input.text[l] = old_build_line
-                            input.line_wrap[l] = true
-                            -- add a new line for the wrapped words
-                            l = l + 1 
-                            insert_text_line(l, "", input.line_wrap[l-1]) 
-                            build_line = words[word_count]
-                            old_build_line=""
-                        else
-                            old_build_line = build_line
-                        end
-                    end
-                    input.text[l] = build_line
-                    input.line_wrap[l] = saved_wrap_state 
-                    if #words > 1 then  -- exclude the edge case where we have a single word that is greater than the width of the text box, no point processing that again
-                        l = l - 1       -- process this line again in case we can now add some words from the line below
-                    end
-                else
-                    -- line is not too wide... if we wrap, then we 
-                    -- might be able to fit a word from the next line
-                    if input.line_wrap[l] then
-                        local trailing_space = (input.text[l+1]:sub(-1) == split_char)
-                        local words = utils_split(input.text[l+1], split_char)
+        local function do_wrap()
+            if opt.wrap then
+                local split_char = opt.split_char or ' '
+                local l = 0
+                while l < #input.text do
+                    l = l + 1
+                    local saved_wrap_state = input.line_wrap[l]
+                    if wrap_width < opt.font:getWidth(input.text[l]) then
+                        -- just assume line is too wide, it will work fine anyway if it is not
+                        local words = utils_split(input.text[l], split_char)
                         local word_count = 1
-                        local build_line = input.text[l]..split_char..(words[1] or "")
-                        local old_build_line = input.text[l]
-                        local finished = false
-                        while not finished and word_count < #words do
+                        local build_line = words[1] or ""
+                        local old_build_line = words[1]
+                        while word_count < #words do
+                            word_count = word_count + 1
+                            build_line = build_line..split_char..words[word_count]
                             if wrap_width < opt.font:getWidth(build_line) then
                                 -- we went over a line wrap
                                 input.text[l] = old_build_line
-                                finished = true
+                                input.line_wrap[l] = true
+                                -- add a new line for the wrapped words
+                                l = l + 1 
+                                insert_text_line(l, "", input.line_wrap[l-1]) 
+                                build_line = words[word_count]
+                                old_build_line=""
                             else
-                                -- adjust the cursor if it was on the line that was shortened
-                                local cl = input.cursorline
-                                if cl == l+1 then
-                                    input.cursor = input.cursor - (utf8.len(words[word_count]) + 1)       -- +1 for space
-                                    if input.cursor <= 0 then
-                                        input.cursorline = input.cursorline - 1
-                                        input.cursor = utf8.len(build_line) + input.cursor + 1
-                                    end
-                                end
                                 old_build_line = build_line
-                                word_count = word_count + 1
-                                build_line = build_line..split_char..words[word_count]
                             end
                         end
-                        if not finished then
-                            -- we ran out of words
-                            if wrap_width < opt.font:getWidth(build_line) then
-                                -- but the last word does not fit
-                                input.text[l] = old_build_line
-                            else
-                                -- and the last word fits..!
-                                input.text[l] = build_line
-                                word_count = word_count + 1
+                        input.text[l] = build_line
+                        input.line_wrap[l] = saved_wrap_state 
+                        if #words > 1 then  -- exclude the edge case where we have a single word that is greater than the width of the text box, no point processing that again
+                            l = l - 1       -- process this line again in case we can now add some words from the line below
+                        end
+                    else
+                        -- line is not too wide... if we wrap, then we 
+                        -- might be able to fit a word from the next line
+                        if input.line_wrap[l] then
+                            local trailing_space = (input.text[l+1]:sub(-1) == split_char)
+                            local words = utils_split(input.text[l+1], split_char)
+                            local word_count = 1
+                            local build_line = input.text[l]..split_char..(words[1] or "")
+                            local old_build_line = input.text[l]
+                            local finished = false
+                            while not finished and word_count < #words do
+                                if wrap_width < opt.font:getWidth(build_line) then
+                                    -- we went over a line wrap
+                                    input.text[l] = old_build_line
+                                    finished = true
+                                else
+                                    -- adjust the cursor if it was on the line that was shortened
+                                    local cl = input.cursorline
+                                    if cl == l+1 then
+                                        input.cursor = input.cursor - (utf8.len(words[word_count]) + 1)       -- +1 for space
+                                        if input.cursor <= 0 then
+                                            input.cursorline = input.cursorline - 1
+                                            input.cursor = utf8.len(build_line) + input.cursor + 1
+                                        end
+                                    end
+                                    old_build_line = build_line
+                                    word_count = word_count + 1
+                                    build_line = build_line..split_char..words[word_count]
+                                end
                             end
-                        end
-                        input.text[l+1] = words[word_count] or ""
-                        while word_count < #words do
-                            word_count = word_count + 1
-                            input.text[l+1] = input.text[l+1]..split_char..words[word_count]
-                        end
-                        if input.text[l+1] == "" or input.text[l+1] == split_char then
-                            remove_text_line(l+1)
-                        elseif trailing_space then
-                            input.text[l+1] = input.text[l+1]..split_char
+                            if not finished then
+                                -- we ran out of words
+                                if wrap_width < opt.font:getWidth(build_line) then
+                                    -- but the last word does not fit
+                                    input.text[l] = old_build_line
+                                else
+                                    -- and the last word fits..!
+                                    input.text[l] = build_line
+                                    word_count = word_count + 1
+                                end
+                            end
+                            input.text[l+1] = words[word_count] or ""
+                            while word_count < #words do
+                                word_count = word_count + 1
+                                input.text[l+1] = input.text[l+1]..split_char..words[word_count]
+                            end
+                            if input.text[l+1] == "" or input.text[l+1] == split_char then
+                                remove_text_line(l+1)
+                            elseif trailing_space then
+                                input.text[l+1] = input.text[l+1]..split_char
+                            end
                         end
                     end
+                end        
+                
+                -- okay, leave at least one blank string
+                if #input.text == 0 then
+                    input.text[1] = ""
                 end
-            end        
-            
-            -- okay, leave at least one blank string
-            if #input.text == 0 then
-                input.text[1] = ""
             end
         end
-
+        
+        --do_wrap()
 
 		-- get size of text and cursor position
 		opt.cursor_pos = 0
@@ -750,10 +754,12 @@ do
                     if keycode == 'x' or keycode == 'X' then
                         copy_selection()
                         delete_selection()
+                        do_wrap()
                         input.process_selection = false
                     end
                     if keycode == 'c' or keycode == 'C' then
                         copy_selection()
+                        do_wrap()
                         --input.process_selection = false
                     end
                 end
@@ -762,6 +768,7 @@ do
                         delete_selection()
                     end
                     insert_selection()
+                    do_wrap()
                     input.process_selection = false
                 end                    
             else
@@ -776,6 +783,7 @@ do
                     local a,b = split(input.text[input.cursorline], input.cursor)
                     input.text[input.cursorline] = table.concat{a, char, b}
                     input.cursor = input.cursor + utf8.len(char)
+                    do_wrap()
                 end
 
                 -- text editing
@@ -800,6 +808,7 @@ do
                             input.cursor = math.max(1, input.cursor-1)
                         end
                     end
+                    do_wrap()
                 elseif keycode == 'delete' then
                     if input.process_selection then 
                         -- delete the whole selection?
@@ -820,6 +829,7 @@ do
                             input.text[input.cursorline] = table.concat{a, b}
                         end
                     end
+                    do_wrap()
                 elseif keycode == 'return' then
                     if input.process_selection then 
                         -- delete the whole selection?
@@ -831,9 +841,7 @@ do
                     input.cursor = 1
                     input.cursorline = input.cursorline + 1
                     insert_text_line(input.cursorline, b)
-                
-                    -- implement copy, paste, cut, undo with our selection buffer
-                
+                    do_wrap()
                 end
 
                 -- cursor movement

@@ -356,10 +356,12 @@ function editor:update()
         
         -- play instead of editing
         -- edit mode button
-        suit.layout:reset(600,1000,15)
-        if suit.Button("Edit", suit.layout:row(150,40)).hit then normal_mode = 'edit' end
-        suit.layout:reset(400,1000,15)
-        if suit.Button("Reset", suit.layout:row(150,40)).hit then story_node = 1 end
+        suit.layout:reset(640,1000,15)
+        if suit.Button("Edit", suit.layout:row(150,60)).hit then normal_mode = 'edit' end
+        suit.layout:reset(480,1000,15)
+        if suit.Button("Reset", suit.layout:row(150,60)).hit then story_node = 1 end
+        suit.layout:reset(320,1000,15)
+        if suit.Button("Reset Player Status", suit.layout:row(150,60)).hit then player_status.text = {""} end
         
         -- the layout will grow down and to the right from this point
         suit.layout:reset(25,25,25)
