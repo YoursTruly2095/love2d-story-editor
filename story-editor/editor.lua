@@ -446,7 +446,7 @@ function editor:update()
         suit.layout:up(0, 245)
         suit.layout:right(75, 0)        -- I don't understand why these values work but whatever
         
-        suit.Input(story[story_alt].text, {id=story[story_alt].id, wrap=true}, suit.layout:col(700,265))
+        suit.Input(story[story_alt].text, {id=story[story_alt].id, wrap=true, undo=true}, suit.layout:col(700,265))
         suit.Label("reqs",suit.layout:row(lw,35))
         suit.Input(story[story_alt].reqs, {id=story[story_alt].id.."reqs"}, suit.layout:col(700-lw,35))
         

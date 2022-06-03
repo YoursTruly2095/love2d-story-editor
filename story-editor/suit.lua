@@ -391,6 +391,8 @@ do
 
 		input.text = input.text or {""}
         input.line_wrap = input.line_wrap or {}
+        input.undo = input.undo or {""}
+        input.undo_pointer = input.undo_pointer or 0
         
         local function insert_text_line(l, text, wrap)
             wrap = wrap or false
@@ -719,7 +721,126 @@ do
                 input.cursor = utf8.len(input.text[input.cursorline])+1 
             end
         end
+        
+        local function type_character(char)    
+            local a,b = split(input.text[input.cursorline], input.cursor)
+            input.text[input.cursorline] = table.concat{a, char, b}
+            input.cursor = input.cursor + utf8.len(char)
+        end
             
+        local function type_return()    
+            local a,b = split(input.text[input.cursorline], input.cursor)
+            input.text[input.cursorline] = a
+            input.cursor = 1
+            input.cursorline = input.cursorline + 1
+            insert_text_line(input.cursorline, b)
+        end
+        
+        local function delete_character()
+            local c
+            if input.cursor == 1 then
+                -- backspace removes a line break
+                c={'return'}
+                if input.cursorline > 1 then
+                    local a = input.text[input.cursorline-1]
+                    local b = input.text[input.cursorline]
+                    remove_text_line(input.cursorline)
+                    input.text[input.cursorline] = table.concat{a,b}
+                end
+            else
+                local a,b = split(input.text[input.cursorline], input.cursor)
+                a, c = split(a,utf8.len(a))
+                input.text[input.cursorline] = table.concat{a, b}
+                input.cursor = math.max(1, input.cursor-1)
+            end
+            return c
+        end
+        
+        local function undo_record(char)
+            input.undo_pointer = input.undo_pointer + 1
+            input.undo[input.undo_pointer] = {char, input.cursor, input.cursorline}
+            for x = input.undo_pointer + 1, #input.undo do
+                input.undo[x] = nil
+            end
+        end
+               
+        local function undo()
+            -- check there is anything to undo
+            if input.undo_pointer == 0 then return end
+            
+            -- undo the thing at the undo pointer
+            local undo = input.undo[input.undo_pointer]
+            
+            -- set the cursor to the correct location
+            local c = undo[2]
+            local cl = undo[3]
+            if cl <= #input.text and c <= utf8.len(input.text[cl]) then
+                -- this is imperfect and will fail in some edge cases
+                -- but supporting them all isn't worth the effort
+                -- if this fails, we just assume the cursor is at the right place already
+                -- which it usually will be
+                input.cursor = c
+                input.cursorline = cl
+            end
+            
+            if type(undo[1]) ~= 'table' then
+                -- a normal character, just delete it
+                delete_character()
+            else
+                local action = undo[1]
+                if action[1] == 'return' then
+                    -- undo a carriage return
+                    -- delete_character() does this just fine
+                    delete_character()
+                elseif action[1] == 'delete' then
+                    -- undo a delete... so retype the character
+                    local char = action[2]
+                    type_character(char)
+                end
+            end
+            
+            if opt.wrap then do_wrap() end
+            
+            input.undo_pointer = input.undo_pointer - 1
+        end
+        
+        local function redo()
+            -- check there is anything to redo
+            if input.undo_pointer == #input.undo then return end
+            
+            -- redo the thing at the undo pointer
+            input.undo_pointer = input.undo_pointer + 1
+            local redo = input.undo[input.undo_pointer]
+            
+            -- set the cursor for the redo
+            local c = redo[2]-1
+            local cl = redo[3]
+            if cl <= #input.text and c <= utf8.len(input.text[cl]) then
+                -- this is imperfect and will fail in some edge cases
+                -- but supporting them all isn't worth the effort
+                -- if this fails, we just assume the cursor is at the right place already
+                -- which it usually will be
+                input.cursor = c
+                input.cursorline = cl
+            end
+            
+            if type(redo[1]) ~= 'table' then
+                -- a normal character, just type it
+                type_character(redo[1])
+                if opt.wrap then do_wrap() end
+            else
+                local action = redo[1]
+                if action[1] == 'return' then
+                    -- redo a carriage return
+                    -- delete_character() does this just fine
+                    type_return()
+                elseif action[1] == 'delete' then
+                    -- redo a delete... so delete the character
+                    delete_character()
+                end
+            end
+        end
+        
  		-- compute drawing offset
 		local wm = w - 6 -- consider margin
 		input.text_draw_offset = input.text_draw_offset or 0
@@ -754,12 +875,12 @@ do
                     if keycode == 'x' or keycode == 'X' then
                         copy_selection()
                         delete_selection()
-                        do_wrap()
+                        if opt.wrap then do_wrap() end
                         input.process_selection = false
                     end
                     if keycode == 'c' or keycode == 'C' then
                         copy_selection()
-                        do_wrap()
+                        if opt.wrap then do_wrap() end
                         --input.process_selection = false
                     end
                 end
@@ -768,9 +889,12 @@ do
                         delete_selection()
                     end
                     insert_selection()
-                    do_wrap()
+                    if opt.wrap then do_wrap() end
                     input.process_selection = false
                 end                    
+                if keycode == 'z' or keycode == 'Z' then
+                    if opt.undo then if shifted then redo() else undo() end end
+                end
             else
             
                 -- text input
@@ -780,10 +904,9 @@ do
                         delete_selection()
                         input.process_selection = false
                     end
-                    local a,b = split(input.text[input.cursorline], input.cursor)
-                    input.text[input.cursorline] = table.concat{a, char, b}
-                    input.cursor = input.cursor + utf8.len(char)
-                    do_wrap()
+                    type_character(char)
+                    if opt.wrap then do_wrap() end
+                    if opt.undo then undo_record(char) end
                 end
 
                 -- text editing
@@ -791,24 +914,13 @@ do
                     if input.process_selection then 
                         -- delete the whole selection?
                         delete_selection()
+                        if opt.wrap then do_wrap() end
                         input.process_selection = false
                     else
-                    
-                        if input.cursor == 1 then
-                            -- backspace removes a line break
-                            if input.cursorline > 1 then
-                                local a = input.text[input.cursorline-1]
-                                local b = input.text[input.cursorline]
-                                remove_text_line(input.cursorline)
-                                input.text[input.cursorline] = table.concat{a,b}
-                            end
-                        else
-                            local a,b = split(input.text[input.cursorline], input.cursor)
-                            input.text[input.cursorline] = table.concat{split(a,utf8.len(a)), b}
-                            input.cursor = math.max(1, input.cursor-1)
-                        end
+                        local char=delete_character()
+                        if opt.wrap then do_wrap() end
+                        if opt.undo then undo_record({'delete', char}) end
                     end
-                    do_wrap()
                 elseif keycode == 'delete' then
                     if input.process_selection then 
                         -- delete the whole selection?
@@ -829,19 +941,16 @@ do
                             input.text[input.cursorline] = table.concat{a, b}
                         end
                     end
-                    do_wrap()
+                    if opt.wrap then do_wrap() end
                 elseif keycode == 'return' then
                     if input.process_selection then 
                         -- delete the whole selection?
                         delete_selection()
                         input.process_selection = false
                     end
-                    local a,b = split(input.text[input.cursorline], input.cursor)
-                    input.text[input.cursorline] = a
-                    input.cursor = 1
-                    input.cursorline = input.cursorline + 1
-                    insert_text_line(input.cursorline, b)
-                    do_wrap()
+                    type_return()
+                    if opt.wrap then do_wrap() end
+                    if opt.undo then undo_record({'return'}) end
                 end
 
                 -- cursor movement
