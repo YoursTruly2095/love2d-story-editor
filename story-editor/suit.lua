@@ -474,7 +474,6 @@ do
         
         -- handle word wrap immediately after setting up input.text
         local function do_wrap()
-            if opt.wrap then
                 local split_char = opt.split_char or ' '
                 local l = 0
                 while l < #input.text do
@@ -566,10 +565,12 @@ do
                 if #input.text == 0 then
                     input.text[1] = ""
                 end
-            end
         end
         
-        --do_wrap()
+        if opt.wrap and not opt.initial_wrap then
+            do_wrap()
+            opt.initial_wrap = true
+        end
 
 		-- get size of text and cursor position
 		opt.cursor_pos = 0

@@ -492,6 +492,12 @@ function editor:update()
         local function node(k)
             local results = options[k].results.text[1]
             local node = check_status(results, "node")
+            if node == '?' then
+                -- node we pointed to has been previously deleted or otherwise rendered '?'
+                local s,e = results:find("node=%?;") 
+                options[k].results.text[1] = results:sub(1,s-1)..results:sub(e+1)                 
+                node = nil
+            end
             if node == nil then
                 new_node(k)
             else
