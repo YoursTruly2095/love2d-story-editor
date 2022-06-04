@@ -52,6 +52,7 @@ local normal_mode = 'edit'
 local player_status = { text={""} }
 
 local button_locations = {}
+local map_button_height = 40
 
 function editor:load()
     -- make love use font which support CJK text
@@ -59,7 +60,7 @@ function editor:load()
     love.graphics.setFont(font)
     love.keyboard.setKeyRepeat(true)
 end
-
+    
 function editor:update()
     -- all the UI is defined in love.update or functions that are called from it
     local story = data[story_node].story
@@ -448,7 +449,7 @@ function editor:update()
         
         suit.Input(story[story_alt].text, {id=story[story_alt].id, wrap=true, undo=true}, suit.layout:col(700,265))
         suit.Label("reqs",suit.layout:row(lw,35))
-        suit.Input(story[story_alt].reqs, {id=story[story_alt].id.."reqs"}, suit.layout:col(700-lw,35))
+        suit.Input(story[story_alt].reqs, {id=story[story_alt].id.."reqs", undo=true}, suit.layout:col(700-lw,35))
         
         
         -- OPTIONS
@@ -563,13 +564,13 @@ function editor:update()
         local function entry(k)
             suit.Label("opt"..k,suit.layout:col(lw,35))
             suit.layout:padding(0)
-            suit.Input(options[k].text, {id=options[k].id}, suit.layout:col(tw,35))
+            suit.Input(options[k].text, {id=options[k].id, undo=true}, suit.layout:col(tw,35))
             suit.layout:left(lw)
             suit.Label("reqs",suit.layout:row(lw,35))
-            suit.Input(options[k].reqs, {id=options[k].id.."reqs"}, suit.layout:col(tw,35))
+            suit.Input(options[k].reqs, {id=options[k].id.."reqs", undo=true}, suit.layout:col(tw,35))
             suit.layout:left(lw)
             suit.Label("result",suit.layout:row(lw,35))
-            suit.Input(options[k].results, {id=options[k].id.."results"}, suit.layout:col(tw,35))
+            suit.Input(options[k].results, {id=options[k].id.."results", undo=true}, suit.layout:col(tw,35))
             suit.layout:up(tw,70)
             suit.layout:padding(25)
             
@@ -619,54 +620,16 @@ function editor:update()
         scroll_offset = 0        
     end
         
-	
-    
---[[        
-    if #data > 1 then
-        -- for all other nodes, need to work out what the deepest level is
-        -- this is really problematic because of potential looping
-        local level = {1}
-        for node = 2, #data do
-            -- check which nodes lead to this node
-            for psn in 1, #data do  -- potential source node
-                if psn ~= node then
-                    for k, v in ipairs(data[psn].options) do
-                        local results = v.results.text[1]
-                        local dn = check_status(results, "node")    -- destination node
-                        if dn == node then
-                            -- this potential source node actually is a real source node!
-                            if level[psn] and level[node] == nil or level[node] <= level[psn] then
-                                level[node] = level[psn]+1
-                            end
-                        end
-                    end
-                end
-            end
-        end
---]]
         
-        -- try looking at levels instead??
-        -- all nodes that are only sourced from level 1 are at level 2
-        -- if there are no such nodes, but there are still unassigned nodes... oops!
-            -- in this case, pick a node that is accessed from level 1 and call it level 2
+    -- try looking at levels
+    -- all nodes that are only sourced from level 1 are at level 2
+    -- if there are no such nodes, but there are still unassigned nodes... oops!
+    --   in this case, pick a node that is accessed from level 1 and call it level 2
     
     local node_levels = {}
 
     if #data > 1 then
---[[        
-        local unassigned_nodes = {} --#data-1
-        unassigned_nodes[1] = false
-        for n=2,#data do
-            unassigned_nodes[n] = true
-        end
         
-        local function any_node_unassigned()
-            for _,v in ipairs(unassigned_nodes) do
-                if v == false then return true end
-            end
-            return false
-        end
---]]        
         node_levels[1] = 1
         for n=2,#data do
             local level = nil
@@ -736,18 +699,31 @@ function editor:update()
                         break
                     end
                 end
-                
             end
-            
-                        
-        end
         
-
+        end
     end
      
     -- actually draw the map
     button_locations = {}
-    for level = 1, 10 do
+    map_button_height = 40
+    
+    local level_height = 100
+    
+    local deepest_level = 0
+    for _,v in ipairs(node_levels) do
+        if v>deepest_level then deepest_level = v end
+    end
+
+    if deepest_level > 10 then
+        level_height = 1000 / deepest_level
+    end
+
+    if map_button_height > (level_height/2) then
+        map_button_height = level_height/2
+    end
+
+    for level = 1, deepest_level do
     
         local buttons = {}
         
@@ -763,13 +739,19 @@ function editor:update()
             
             local offset = map_offset + (gap_width*k) + (button_width*(k-1))
             
-            local display_offset
-            if data[v].display_offset and data[v].display_offset.text then display_offset = tonumber(data[v].display_offset.text[1]) end
-            display_offset = (display_offset or 0) * 10
+            local display_offset = 0
             
-            suit.layout:reset(offset+display_offset, 25 + (level-1)*100)
-            button_locations[v]={offset+(button_width*0.5)+display_offset, 45+(level-1)*100}
-            if suit.Button(v.." (1-"..#data[v].story..")", suit.layout:col(button_width,40)).hit then navigate(v) end
+            if data[v].display_offset and data[v].display_offset.text then 
+                display_offset = (tonumber(data[v].display_offset.text[1]) or 0) * 10 
+            end
+            
+            -- reset to where we want to draw the button
+            suit.layout:reset(offset+display_offset, 25 + (level-1)*level_height)
+            
+            -- record button location for the line drawing
+            button_locations[v]={offset+(button_width/2)+display_offset, 25+(map_button_height/2)+((level-1)*level_height)}
+            
+            if suit.Button(v.." (1-"..#data[v].story..")", suit.layout:col(button_width,map_button_height)).hit then navigate(v) end
         end    
     end
     
@@ -785,7 +767,7 @@ function editor:draw()
                 local destination_node = check_status(option.results.text[1], 'node')
                 if destination_node ~= nil and button_locations[n] and button_locations[destination_node] then
                     -- draw an arrow for node to destination_node
-                    love.graphics.line(button_locations[n][1],button_locations[n][2]+20,
+                    love.graphics.line(button_locations[n][1],button_locations[n][2]+(map_button_height/2),
                         button_locations[destination_node][1], button_locations[destination_node][2])
                 end
             end
