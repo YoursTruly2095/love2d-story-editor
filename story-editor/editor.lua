@@ -42,7 +42,6 @@ local data =
 local filename = "...none..."
 local editable_filename = { text={""} }
 
-local scroll_offset = 0
 local story_node = 1
 local story_alt = 1
 local id_register = 101
@@ -53,6 +52,11 @@ local player_status = { text={""} }
 
 local button_locations = {}
 local map_button_height = 40
+
+-- for the options / option delete screen
+local scroll_offset = 0
+local option_to_delete
+local options_to_display=4
 
 function editor:load()
     -- make love use font which support CJK text
@@ -265,10 +269,39 @@ function editor:update()
         if suit.Button("Cancel", suit.layout:row(150,70)).hit then mode = 'normal' end
     end
     
+    local function delete_option_screen()
+        
+        local function actual_delete(which)
+            table.remove(options, which)
+            
+            -- fix scroll offset
+            if scroll_offset > #options-options_to_display then scroll_offset = #options-options_to_display end
+            if scroll_offset < 0 then scroll_offset = 0 end
+            
+            mode='normal'
+        end
+    
+        suit.layout:reset(25,25,25)
+        if #options > 1 then
+            suit.Label("Are you sure you want to delete this option?",suit.layout:col(900,40))
+            suit.Label("Option text, reqs and results will be irretrievably lost.",suit.layout:row(900,40))
+        else
+            suit.Label("You cannot delete the last option.",suit.layout:col(900,40))
+        end
+        
+        -- delete and cancel buttons
+        suit.layout:reset(25,870,25)
+        if #options > 1 and option_to_delete then
+            if suit.Button("Delete", suit.layout:row(150,70)).hit then actual_delete(option_to_delete) end
+        end
+        if suit.Button("Cancel", suit.layout:row(150,70)).hit then mode = 'normal' end
+    end
+    
     if mode == 'load' then load_screen() return end
     if mode == 'saveas' then save_screen() return end
     if mode == 'quit' then quit_screen() return end
     if mode == 'delete_story' then delete_story_screen() return end
+    if mode == 'delete_option' then delete_option_screen() return end
     
     -- NORMAL MODE
     -- load and save buttons
@@ -453,8 +486,6 @@ function editor:update()
         
         
         -- OPTIONS
-        local options_to_display=4
-        
         local function new_node(k)
             table.insert(data,
                 {
@@ -506,16 +537,6 @@ function editor:update()
             scroll_offset = 0
         end
             
-        local function delete(which)
-            if #options > 1 then
-                table.remove(options, which)
-                
-                -- fix scroll offset
-                if scroll_offset > #options-options_to_display then scroll_offset = #options-options_to_display end
-                if scroll_offset < 0 then scroll_offset = 0 end
-            end
-        end
-        
         local function insert(where,which)
             table.insert(options,where,options[which])
         end
@@ -533,6 +554,12 @@ function editor:update()
             scroll_offset = #options-options_to_display
             if scroll_offset < 0 then scroll_offset = 0 end
         end
+        
+        local function delete_option(which)
+            option_to_delete = which 
+            mode = 'delete_option' 
+        end
+            
         
         local function up(k)
             if k > 1  and #options > 1 then
@@ -582,7 +609,7 @@ function editor:update()
             
             -- check out the horrible construct below
             -- we're using 'else' to make sure we don;t process the other buttons if one actually gets hit
-            if suit.Button("Del", {id="B"..options[k].id}, suit.layout:col(50,52)).hit then delete(k) else
+            if suit.Button("Del", {id="B"..options[k].id}, suit.layout:col(50,52)).hit then delete_option(k) else
             suit.layout:padding(0)
             if suit.Button("Node", {id="N"..options[k].id}, suit.layout:row(50,53)).hit then node(k) else
             suit.layout:up(50,52)
