@@ -58,6 +58,10 @@ local scroll_offset = 0
 local option_to_delete
 local options_to_display=4
 
+local save_dirty = false
+local autosave_dirty = false
+local autosave_time = 0
+
 function editor:load()
     -- make love use font which support CJK text
     local font = love.graphics.newFont("Courier Prime.ttf", 16)
@@ -65,7 +69,7 @@ function editor:load()
     love.keyboard.setKeyRepeat(true)
 end
     
-function editor:update()
+function editor:update(dt)
     -- all the UI is defined in love.update or functions that are called from it
     local story = data[story_node].story
     local options = data[story_node].options
@@ -127,8 +131,8 @@ function editor:update()
         end
     end
         
-    local function save_file() 
-        if filename == '...none...' then mode = 'saveas' return end
+    local function save_file(autosave) 
+        if not autosave and filename == '...none...' then mode = 'saveas' return true end
         local save_data = deep_copy(data)
         for n,node in ipairs(save_data) do
             for s,story_alt in ipairs(node.story) do
@@ -141,13 +145,23 @@ function editor:update()
         
         local success
         local message
-        success, message = love.filesystem.write(filename, save_string)
+        local file = autosave and "autosave" or filename
+        success, message = love.filesystem.write(file, save_string)
         if not success then 
             print("Save failed: "..message) 
         else
-            print("Saved")
+            print(autosave and "Auto Saved" or "Saved")
         end
-        mode = 'normal'
+        
+        if autosave then
+            autosave_dirty = false
+        else
+            save_dirty = false
+        end
+        
+        if not autosave then mode = 'normal' end
+        
+        return success
     end
 
     local function load_screen()
@@ -178,22 +192,28 @@ function editor:update()
         -- display a list of filenames that could be used (?)
         -- allow typing of a new filename
         
-        local function save()
+        local function save(quit)
             -- validate the filename
             -- copy it to 'filename' variable
             filename = editable_filename.text[1]
-            save_file()
+            if save_file() and quit then
+                love.event.quit()
+                return      -- not needed?
+            end
+            
+            if quit then
+                print("Failed to quit due to save error")
+            end
         end
-        
         
         suit.layout:reset(25,25,25)
         suit.Label("filename",suit.layout:col(100,40))
         suit.Input(editable_filename, {id="f"}, suit.layout:col(600,40))
         
-        
         -- save and cancel buttons
-        suit.layout:reset(25,870,25)
+        suit.layout:reset(25,775,25)
         if suit.Button("Save", suit.layout:row(150,70)).hit then save() end
+        if suit.Button("Save and Quit", suit.layout:row(150,70)).hit then save(true) end
         if suit.Button("Cancel", suit.layout:row(150,70)).hit then mode = 'normal' end
     end
     
@@ -204,7 +224,13 @@ function editor:update()
         end
         
         suit.layout:reset(25,25,25)
-        suit.Label("All unsaved data will be lost upon quit!",suit.layout:col(900,40))
+        local quit_message
+        if save_dirty then 
+            quit_message = "All unsaved data will be lost upon quit!"
+        else
+            quit_message = "Are you sure you want to quit?" 
+        end
+        suit.Label(quit_message,suit.layout:col(900,40))
         
         -- save and cancel buttons
         suit.layout:reset(25,870,25)
@@ -295,6 +321,16 @@ function editor:update()
             if suit.Button("Delete", suit.layout:row(150,70)).hit then actual_delete(option_to_delete) end
         end
         if suit.Button("Cancel", suit.layout:row(150,70)).hit then mode = 'normal' end
+    end
+    
+    -- autosave
+    if autosave_dirty then
+        autosave_time = autosave_time + dt
+        if autosave_time > 5 then
+            save_file(true)     -- true means autosave
+            autosave_time = 0
+            autosave_dirty = false
+        end
     end
     
     if mode == 'load' then load_screen() return end
@@ -825,6 +861,8 @@ end
 function love.textinput(t)
 	-- forward text input to SUIT
 	suit.textinput(t)
+    autosave_dirty = true
+    save_dirty = true
 end
 
 function love.keypressed(key)
