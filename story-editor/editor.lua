@@ -424,6 +424,12 @@ function editor:update(dt)
         
         end
         
+        local function reset_player_status()
+            player_status.text = {""}
+            player_status.cursorline = 1
+            player_status.cursor = 1
+        end
+        
         -- play instead of editing
         -- edit mode button
         suit.layout:reset(640,1000,15)
@@ -431,7 +437,7 @@ function editor:update(dt)
         suit.layout:reset(480,1000,15)
         if suit.Button("Reset", suit.layout:row(150,60)).hit then story_node = 1 end
         suit.layout:reset(320,1000,15)
-        if suit.Button("Reset Player Status", suit.layout:row(150,60)).hit then player_status.text = {""} end
+        if suit.Button("Reset Player Status", suit.layout:row(150,60)).hit then reset_player_status() end
         
         -- the layout will grow down and to the right from this point
         suit.layout:reset(25,25,25)
