@@ -395,6 +395,13 @@ function editor:update(dt)
             return check_reqs(reqs,status) 
         end
         
+        local function reset_player_status()
+            player_status.text = {""}
+            player_status.line_wrap = {}
+            player_status.cursorline = 1
+            player_status.cursor = 1
+        end
+        
         local function do_option(opt) 
             
             -- apply results
@@ -420,15 +427,12 @@ function editor:update(dt)
             for k,v in pairs(status) do
                 status_string = status_string..k..v.op..v.val..";"
             end
+            
+            reset_player_status()
             player_status.text[1] = status_string
         
         end
         
-        local function reset_player_status()
-            player_status.text = {""}
-            player_status.cursorline = 1
-            player_status.cursor = 1
-        end
         
         -- play instead of editing
         -- edit mode button
