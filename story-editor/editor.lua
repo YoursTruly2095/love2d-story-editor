@@ -587,6 +587,10 @@ function editor:update(dt)
             table.insert(options,where,options[which])
         end
         
+        local function immediate_delete(which)
+            table.remove(options, which)
+        end
+        
         local function new_option()
             table.insert(options, 
                 {
@@ -610,14 +614,22 @@ function editor:update(dt)
         local function up(k)
             if k > 1  and #options > 1 then
                 insert(k-1, k)
-                delete(k+1)
+                immediate_delete(k+1)
             end
         end
         
+        local delayed_down = nil
         local function down(k)
-            if k < #options and #options > 1 then
-                insert(k+2, k)
-                delete(k)
+            delayed_down = k
+        end
+        
+        local function do_delayed_down()
+            if delayed_down then
+                local k = delayed_down
+                if k < #options and #options > 1 then
+                    insert(k+2, k)
+                    immediate_delete(k)
+                end
             end
         end
         
@@ -662,7 +674,8 @@ function editor:update(dt)
             suit.layout:padding(25)
             if suit.Button("U", {id="U"..options[k].id}, suit.layout:col(50,52)).hit then up(k) else
             suit.layout:padding(0)
-            if suit.Button("D", {id="D"..options[k].id}, suit.layout:row(50,53)).hit then down(k) end end end end
+            if suit.Button("D", {id="D"..options[k].id}, suit.layout:row(50,53)).hit then down(k) else
+            end end end end
         end
 
         -- this must be a while loop not a for loop, because the BIN button 
@@ -686,6 +699,7 @@ function editor:update(dt)
             entry(k+scroll_offset)
             k = k + 1
         end
+        do_delayed_down()
     end -- edit mode
 
     -- STORY MAP
