@@ -6,6 +6,8 @@ require("utils")
 --local bitser = require("bitser")
 local smallfolk = require 'smallfolk'
 
+local utf8 = require 'utf8'
+  
 editor = {}
 
 local data =
@@ -341,10 +343,11 @@ function editor:update(dt)
     
     -- NORMAL MODE
     -- load and save buttons
-    suit.layout:reset(25,900,15)
+    suit.layout:reset(25,845,15)
     if suit.Button("Load", suit.layout:row(150,40)).hit then mode = 'load' end
     if suit.Button("Save", suit.layout:row(150,40)).hit then save_file() end
     if suit.Button("Save As", suit.layout:row(150,40)).hit then mode = 'saveas' end
+    if suit.Button("Quit", suit.layout:row(150,40)).hit then mode = 'quit' end
     suit.layout:padding(0)
     suit.layout:up(0, 55)
     suit.layout:right(180, 0)        -- I don't understand why these values work but whatever
@@ -353,8 +356,8 @@ function editor:update(dt)
     suit.layout:padding(25)
     
     -- quit button
-    suit.layout:reset(800,1000,15)
-    if suit.Button("Quit", suit.layout:row(150,40)).hit then mode = 'quit' end
+    --suit.layout:reset(800,1000,15)
+    --if suit.Button("Quit", suit.layout:row(150,40)).hit then mode = 'quit' end
         
     local lw = 80                   -- label width
     
@@ -491,9 +494,114 @@ function editor:update(dt)
         local function story_left() 
             if story_alt > 1 then story_alt = story_alt - 1 end
         end
+        
         local function story_right() 
             if story_alt < #story then story_alt = story_alt + 1 end
         end
+        
+        local function show_variables_at(x,y,z)
+            
+            if show_variables_list == true and 
+                x==show_variables_location[1] and
+                y==show_variables_location[2] and
+                z==show_variables_location[3] then
+                    show_variables_list = false
+                    return
+            end
+            
+            -- get a list of all the variables
+            local vars = {}
+            for nk,node in ipairs(data) do        
+                for ak,alt in ipairs(node.story) do      
+                    local reqs = convert_op_string(alt.reqs.text[1], decode_req)
+                    for k,v in pairs(reqs) do
+                        vars[k] = true
+                    end
+                end
+                for ok,opt in ipairs(node.options) do
+                    local reqs = convert_op_string(opt.reqs.text[1], decode_req)
+                    for k,v in pairs(reqs) do
+                        vars[k] = true
+                    end
+                    local results = convert_op_string(opt.results.text[1], decode_results)
+                    for k,v in pairs(results) do
+                        vars[k] = true
+                    end
+                end
+            end
+            
+            vars[node]=nil      -- don't display 'node' in the vars list
+            
+            show_variables_vars = vars
+            show_variables_location = {x,y,z}
+            show_variables_list = true
+        end
+                
+        local function insert_variable(var, location)
+            --local text = story[story_alt].reqs.text[1]
+            --local pos = story[story_alt].reqs.cursor
+            
+            local r
+            if location[1] == 'story' then
+                r = story[story_alt].reqs
+            else
+                -- location is an option
+                if location[3] == 'results' then
+                    r = options[location[2]].results
+                else
+                    r = options[location[2]].reqs
+                end
+            end
+            
+            -- ian=3;
+            
+            local split = r.cursor-1
+            while split <= r.text[1]:len() and r.text[1]:sub(split,split) ~= ';' do
+                print(r.text[1]:sub(1,1),r.text[1]:sub(5,5),r.text[1]:sub(6,6), r.text[1]:sub(split,split), split, r.text[1])
+                split = split + 1
+            end
+            
+            if r.text[1]:len() > 0 and r.text[1]:sub(split,split) ~= ';' then
+                r.text[1] = r.text[1]..';'
+                split = split + 1
+            end
+            
+            split = split + 1
+            
+            local s,e = r.text[1]:sub(1,split-1),r.text[1]:sub(split)
+          
+            r.text[1] = s..var.."=?;"..e
+            r.cursor = split + utf8.len(var)+2
+            
+            show_variables_list = false
+        end
+        
+        local function show_variables()        
+            local vars = show_variables_vars
+            local location = show_variables_location
+            
+            if not vars or next(vars) == nil or not location then 
+                show_variables_list = false
+                return 
+            end
+            
+            if location[1] == 'story' then
+                suit.layout:reset(900,285,0)
+            else
+                -- location is an option
+                local y = 385
+                y = y + (125 * (location[2] - 1))
+                if location[3] == 'results' then
+                    y = y + 35
+                end                
+                suit.layout:reset(780,y,0)
+            end
+            
+            for k,v in pairs(vars) do
+                if suit.Button(k, suit.layout:row(600,35)).hit then insert_variable(k, location) end
+            end
+        end
+        
         
         -- the layout will grow down and to the right from this point
         suit.layout:reset(25,25,25)
@@ -528,8 +636,12 @@ function editor:update(dt)
         
         suit.Input(story[story_alt].text, {id=story[story_alt].id, wrap=true, undo=true}, suit.layout:col(700,265))
         suit.Label("reqs",suit.layout:row(lw,35))
-        suit.Input(story[story_alt].reqs, {id=story[story_alt].id.."reqs", undo=true}, suit.layout:col(700-lw,35))
+        suit.Input(story[story_alt].reqs, {id=story[story_alt].id.."reqs", undo=true}, suit.layout:col(665-lw,35))
+        if suit.Button(">", suit.layout:col(35,35)).hit then show_variables_at('story') end
         
+        if show_variables_list then
+            show_variables()
+        end
         
         -- OPTIONS
         local function new_node(k)
@@ -648,7 +760,7 @@ function editor:update(dt)
                 
                 
         
-        local tw = 700-50-50-25-25-80   -- text width
+        local tw = 700-50-50-10-10-80   -- text width
         
         suit.layout:reset(25,350,25)
         
@@ -658,12 +770,14 @@ function editor:update(dt)
             suit.Input(options[k].text, {id=options[k].id, undo=true}, suit.layout:col(tw,35))
             suit.layout:left(lw)
             suit.Label("reqs",suit.layout:row(lw,35))
-            suit.Input(options[k].reqs, {id=options[k].id.."reqs", undo=true}, suit.layout:col(tw,35))
-            suit.layout:left(lw)
+            suit.Input(options[k].reqs, {id=options[k].id.."reqs", undo=true}, suit.layout:col(tw-35,35))
+            if suit.Button(">", {id=">"..options[k].id.."reqs"}, suit.layout:col(35,35)).hit then show_variables_at('options',k,'reqs') end
+            suit.layout:left(lw+tw-35)
             suit.Label("result",suit.layout:row(lw,35))
-            suit.Input(options[k].results, {id=options[k].id.."results", undo=true}, suit.layout:col(tw,35))
-            suit.layout:up(tw,70)
-            suit.layout:padding(25)
+            suit.Input(options[k].results, {id=options[k].id.."results", undo=true}, suit.layout:col(tw-35,35))
+            if suit.Button(">", {id=">"..options[k].id.."results"}, suit.layout:col(35,35)).hit then show_variables_at('options',k,'results') end
+            suit.layout:up(35,70)
+            suit.layout:padding(10)
             
             -- check out the horrible construct below
             -- we're using 'else' to make sure we don;t process the other buttons if one actually gets hit
@@ -671,7 +785,7 @@ function editor:update(dt)
             suit.layout:padding(0)
             if suit.Button("Node", {id="N"..options[k].id}, suit.layout:row(50,53)).hit then node(k) else
             suit.layout:up(50,52)
-            suit.layout:padding(25)
+            suit.layout:padding(10)
             if suit.Button("U", {id="U"..options[k].id}, suit.layout:col(50,52)).hit then up(k) else
             suit.layout:padding(0)
             if suit.Button("D", {id="D"..options[k].id}, suit.layout:row(50,53)).hit then down(k) else
@@ -700,7 +814,9 @@ function editor:update(dt)
             k = k + 1
         end
         do_delayed_down()
+    
     end -- edit mode
+
 
     -- STORY MAP
     local map_offset = 920
