@@ -530,7 +530,7 @@ function editor:update(dt)
                 end
             end
             
-            vars[node]=nil      -- don't display 'node' in the vars list
+            vars['node']=nil      -- don't display 'node' in the vars list
             
             show_variables_vars = vars
             show_variables_location = {x,y,z}
@@ -552,8 +552,6 @@ function editor:update(dt)
                     r = options[location[2]].reqs
                 end
             end
-            
-            -- ian=3;
             
             local split = r.cursor-1
             while split <= r.text[1]:len() and r.text[1]:sub(split,split) ~= ';' do
@@ -585,17 +583,27 @@ function editor:update(dt)
                 return 
             end
             
+            local x, y
             if location[1] == 'story' then
-                suit.layout:reset(900,285,0)
+                x=900
+                y=285
             else
                 -- location is an option
-                local y = 385
-                y = y + (125 * (location[2] - 1))
+                x=780
+                y = 385
+                y = y + (130 * (location[2] - 1))
                 if location[3] == 'results' then
                     y = y + 35
-                end                
-                suit.layout:reset(780,y,0)
+                end               
             end
+            
+            local count=0
+            for _,_ in pairs(vars) do count = count + 1 end
+            
+            if y+(35*count) > 1080 then y = 1080-(35*count) end
+            if y < 0 then y=0 end
+                
+            suit.layout:reset(x,y,0)
             
             for k,v in pairs(vars) do
                 if suit.Button(k, suit.layout:row(600,35)).hit then insert_variable(k, location) end
