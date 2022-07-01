@@ -54,6 +54,7 @@ local player_status = { text={""} }
 
 local button_locations = {}
 local map_button_height = 40
+local button_width = 100
 
 -- for the options / option delete screen
 local scroll_offset = 0
@@ -134,6 +135,7 @@ function editor:update(dt)
     end
         
     local function save_file(autosave) 
+        if autosave then return end
         if not autosave and filename == '...none...' then mode = 'saveas' return true end
         local save_data = deep_copy(data)
         for n,node in ipairs(save_data) do
@@ -829,7 +831,6 @@ function editor:update(dt)
     -- STORY MAP
     local map_offset = 920
     local map_width = 1000
-    local button_width = 100
     
     local function navigate(node)
         story_node = node
@@ -975,23 +976,104 @@ function editor:update(dt)
 
 end
 
+function drawArrowHead (x, y, angle) -- position, length, width and angle
+	local length = 20
+    local width = 10
+    love.graphics.push("all")
+    love.graphics.setColor(1, 1, 1)
+	love.graphics.translate(x, y)
+	love.graphics.rotate( angle )
+	love.graphics.polygon("fill", -length, -width/2, -length, width/2, 0, 0)
+	love.graphics.pop() 
+end
+
 function editor:draw()
 
+    local function draw_arrow(src_node, dest_node)
+        -- draw an arrow for node to destination_node
+        
+        local src_x, src_y = button_locations[src_node][1], button_locations[src_node][2]+(map_button_height/2)
+        local dst_x, dst_y = button_locations[dest_node][1], button_locations[dest_node][2]
+        
+        local dy, dx = (dst_y-src_y), (dst_x-src_x)
+        local angle = math.atan(dy/dx) 
+        
+        -- adjust arrowhead to edge of destination box
+        if src_y == dst_y then
+            -- don't think the rest of the map code lets this happen
+            -- but implement just in case that changes in future
+            if dst_x > src_x then 
+                dst_x = dst_x - (button_width/2) 
+            else
+                dst_x = dst_x + (button_width/2) 
+            end
+        else    
+            if src_y < dst_y then 
+                dst_y = dst_y - (map_button_height/2) 
+            else
+                dst_y = dst_y + (map_button_height/2) 
+            end
+            
+            local adjust = (math.tan(angle-(math.pi/2)) * (map_button_height/2))
+            if math.abs(adjust) > (button_width/2) then 
+                if adjust > 0 then adjust = (button_width/2) else adjust = -(button_width/2) end
+                
+                local adjust_y = math.abs((button_width/2) / math.tan(angle-(math.pi/2)))
+                if src_y < dst_y then 
+                    dst_y = dst_y + (map_button_height/2) - adjust_y
+                else
+                    dst_y = dst_y - (map_button_height/2) + adjust_y
+                end
+            end
+            
+            if src_y > dst_y then adjust = -adjust end
+            dst_x = dst_x + adjust 
+        end
+        
+        -- recalculate the angle
+        dy, dx = (dst_y-src_y), (dst_x-src_x)
+        angle = math.atan(dy/dx)
+        if dx < 0 then angle = angle + math.pi end
+        
+        love.graphics.line(src_x, src_y, dst_x, dst_y)
+        drawArrowHead(dst_x, dst_y, angle)
+    end
+    
     -- draw lines between buttons to be options
     if mode == 'normal' then
         for n, node in ipairs(data) do
             for o, option in ipairs(node.options) do
                 local destination_node = check_status(option.results.text[1], 'node')
                 if destination_node ~= nil and button_locations[n] and button_locations[destination_node] then
-                    -- draw an arrow for node to destination_node
-                    love.graphics.line(button_locations[n][1],button_locations[n][2]+(map_button_height/2),
-                        button_locations[destination_node][1], button_locations[destination_node][2])
+                    draw_arrow(n,destination_node)
                 end
             end
         end
     end
     
     suit.draw()
+--[[    
+    love.graphics.line(500, 500, 500, 1000)
+    love.graphics.line(250, 750, 750, 750)
+    
+    drawArrowHead(500, 500, 3/2*math.pi)
+    drawArrowHead(750, 750, 0)
+    drawArrowHead(500, 1000, math.pi/2)
+    drawArrowHead(250, 750, math.pi)
+    
+    
+    local x1,y1 = 100, 100
+    local x2,y2 = 100, 300
+    
+    local dx,dy = x2-x1, y2-y1
+   
+    local angle = math.atan(dy/dx)
+    
+    love.graphics.line(x1,y1,x2,y2)
+    drawArrowHead(x2, y2, angle)
+    drawArrowHead(x1, y1, angle+math.pi)
+--]]    
+    
 
 end
 
